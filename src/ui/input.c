@@ -99,6 +99,15 @@ struct Msg handle_name_playlist_event(struct tb_event *ev)
 
         if (model->state.ui.naming_playlist) {
 
+                if (model->state.ui.prompt_kind == PROMPT_CONFIRM_DELETE) {
+                        if (ev->ch == 'y' || ev->ch == 'Y')
+                                playlist_prompt_confirm();
+                        else
+                                playlist_prompt_cancel();
+                        event.type = MSG_NAMING_PLAYLIST;
+                        return event;
+                }
+
                 if (ev->key == TB_KEY_ESC) {
                         playlist_prompt_cancel();
                         event.type = MSG_NAMING_PLAYLIST;

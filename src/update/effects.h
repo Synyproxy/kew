@@ -62,7 +62,8 @@ typedef enum {
         CMD_VIEW_CHANGED,
         CMD_CROSSFADE,
         CMD_TOGGLECROSSFADE,
-        CMD_ADD_TO_PLAYLIST
+        CMD_ADD_TO_PLAYLIST,
+        CMD_DELETE_PLAYLIST
 
 } CmdType;
 

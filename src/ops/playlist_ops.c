@@ -1264,11 +1264,60 @@ static void add_pending_entry_to_playlist(void)
         set_error_message(message);
 }
 
+bool request_playlist_delete(void)
+{
+        Model *model = get_model();
+        FileSystemEntry *entry = model->state.ui.current_lib_entry;
+
+        if (model->state.currentView != LIBRARY_VIEW || !is_m3u_file(entry))
+                return false;
+
+        snprintf(model->state.ui.pending_delete_path, sizeof(model->state.ui.pending_delete_path), "%s", entry->full_path);
+
+        char stem[KEW_NAME_MAX];
+        playlist_stem(entry->full_path, stem, sizeof(stem));
+        set_playlist_name(stem);
+
+        model->state.ui.naming_playlist = true;
+        model->state.ui.prompt_kind = PROMPT_CONFIRM_DELETE;
+
+        set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+
+        return true;
+}
+
+void delete_pending_playlist(void)
+{
+        Model *model = get_model();
+        const char *path = model->state.ui.pending_delete_path;
+        char message[KEW_PATH_MAX + 64];
+        char stem[KEW_NAME_MAX];
+
+        if (path[0] == '\0')
+                return;
+
+        playlist_stem(path, stem, sizeof(stem));
+
+        if (playlist_file_delete(path)) {
+                snprintf(message, sizeof(message), "Deleted playlist %s.", stem);
+                model->state.ui.request_library_update = true;
+        } else {
+                snprintf(message, sizeof(message), "Could not delete %s.", path);
+        }
+
+        model->state.ui.pending_delete_path[0] = '\0';
+        set_error_message(message);
+}
+
 void playlist_prompt_confirm(void)
 {
         Model *model = get_model();
 
         switch (model->state.ui.prompt_kind) {
+        case PROMPT_CONFIRM_DELETE:
+                model->state.ui.delete_playlist_confirmed = true;
+                close_prompt();
+                break;
         case PROMPT_SAVE_PLAYLIST:
                 playlist_save();
                 break;
