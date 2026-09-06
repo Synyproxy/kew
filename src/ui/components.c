@@ -1541,9 +1541,9 @@ ComponentMsg component_error_row(const Model *model, k_Rect region, DrawBuffer *
                 if (model->state.ui.prompt_kind == PROMPT_CONFIRM_DELETE)
                         snprintf(msg, sizeof(msg), _("Delete playlist '%s'? (y/N)"), get_playlist_name());
                 else if (model->state.ui.prompt_kind == PROMPT_ADD_TO_PLAYLIST)
-                        snprintf(msg, sizeof(msg), _("Add to playlist: %s█  (Tab: next playlist, Enter: add, Esc: cancel)"), get_playlist_name());
+                        snprintf(msg, sizeof(msg), _("Add to playlist: %s█  (Tab: next, Esc: cancel)"), get_playlist_name());
                 else
-                        snprintf(msg, sizeof(msg), _("Playlist name: %s█  (Tab: existing playlists, Esc: cancel)"), get_playlist_name());
+                        snprintf(msg, sizeof(msg), _("Playlist name: %s█  (Tab: existing, Esc: cancel)"), get_playlist_name());
                 draw_buffer_set_string_truncated(buf, region.row, region.col,
                                                  msg, region.width, style);
                 return (ComponentMsg){0};
@@ -3114,6 +3114,8 @@ ComponentMsg component_help(const Model *model, k_Rect region, DrawBuffer *buf,
         HELP_LINE(_(" · Add Song/Folder To A Playlist In Library: %s"),
                   get_binding_string(MSG_ADDTOPLAYLIST, false));
         HELP_LINE(_(" · Delete Playlist Under Cursor In Library: %s"),
+                  get_binding_string(MSG_REMOVE, true));
+        HELP_LINE(_(" · Remove Track From Playlist (library, track under a playlist): %s"),
                   get_binding_string(MSG_REMOVE, true));
 
 #undef HELP_LINE

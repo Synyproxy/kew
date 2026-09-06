@@ -65,39 +65,29 @@ void sort_library(void)
 
 int mark_as_enqueued(FileSystemEntry *root, char *path, int list_row_num)
 {
-        if (root == NULL)
-                return 0;
-
-        if (path == NULL)
+        if (root == NULL || path == NULL)
                 return 0;
 
         if (list_row_num == 0)
                 list_row_num = 1;
 
-        if (!root->is_directory) {
-                if (strcmp(root->full_path, path) == 0) {
+        int found = 0;
+
+        if (!root->is_directory && strcmp(root->full_path, path) == 0) {
+                root->is_enqueued = list_row_num;
+                found = root->id;
+        }
+
+        for (FileSystemEntry *child = root->children; child != NULL; child = child->next) {
+                int id = mark_as_enqueued(child, path, list_row_num);
+
+                if (id && !found) {
+                        found = id;
                         root->is_enqueued = list_row_num;
-                        return root->id;
-                }
-        } else {
-                FileSystemEntry *child = root->children;
-                int found = 0;
-                while (child != NULL) {
-                        found = mark_as_enqueued(child, path, list_row_num);
-                        child = child->next;
-
-                        if (found)
-                                break;
-                }
-
-                if (found) {
-                        root->is_enqueued = list_row_num;
-
-                        return found;
                 }
         }
 
-        return 0;
+        return found;
 }
 
 void mark_list_as_enqueued(FileSystemEntry *root, PlayList *playlist)
@@ -127,45 +117,34 @@ void mark_list_as_enqueued(FileSystemEntry *root, PlayList *playlist)
 
 bool mark_as_dequeued(FileSystemEntry *root, char *path)
 {
-        int num_children_enqueued = 0;
-
-        if (root == NULL)
+        if (root == NULL || path == NULL)
                 return false;
 
-        if (!root->is_directory) {
-                if (strcmp(root->full_path, path) == 0) {
-                        root->is_enqueued = false;
-                        return true;
-                }
-        } else {
-                FileSystemEntry *child = root->children;
-                bool found = false;
-                while (child != NULL) {
-                        found = mark_as_dequeued(child, path);
-                        child = child->next;
+        bool found = false;
 
-                        if (found)
-                                break;
-                }
-
-                if (found) {
-                        child = root->children;
-
-                        while (child != NULL) {
-                                if (child->is_enqueued)
-                                        num_children_enqueued++;
-
-                                child = child->next;
-                        }
-
-                        if (num_children_enqueued == 0)
-                                root->is_enqueued = false;
-
-                        return true;
-                }
+        if (!root->is_directory && strcmp(root->full_path, path) == 0) {
+                root->is_enqueued = false;
+                found = true;
         }
 
-        return false;
+        bool found_below = false;
+
+        for (FileSystemEntry *child = root->children; child != NULL; child = child->next)
+                if (mark_as_dequeued(child, path))
+                        found_below = true;
+
+        if (found_below) {
+                int num_children_enqueued = 0;
+
+                for (FileSystemEntry *child = root->children; child != NULL; child = child->next)
+                        if (child->is_enqueued)
+                                num_children_enqueued++;
+
+                if (num_children_enqueued == 0)
+                        root->is_enqueued = false;
+        }
+
+        return found || found_below;
 }
 
 void clear_all_m3u_enqueued_flags(FileSystemEntry *root)
@@ -229,6 +208,7 @@ void *update_library_thread(void *arg)
         FileSystemEntry *old = model->library;
 
         copy_is_enqueued(old, tmp);
+        attach_m3u_children(tmp);
 
         model->library = tmp;
 
@@ -444,6 +424,8 @@ void library_init(bool set_enqueued_status)
 
         pthread_mutex_unlock(&(model->state.library_mutex));
 
+        attach_m3u_children(library);
+
         bool wait_until_complete = true;
         update_library_if_changed_detected(wait_until_complete);
 
@@ -464,6 +446,8 @@ void library_init(bool set_enqueued_status)
                 model->library = tmp;
 
                 pthread_mutex_unlock(&(model->state.library_mutex));
+
+                attach_m3u_children(tmp);
         }
 
         if (model->library == NULL || model->library->children == NULL) {
@@ -521,6 +505,11 @@ void enqueue_song(FileSystemEntry *child)
         }
 
         child->parent->is_enqueued = 1;
+
+        FileSystemEntry *library = get_library();
+        bool root_was_enqueued = library->is_enqueued;
+        mark_as_enqueued(library, child->full_path, child->is_enqueued);
+        library->is_enqueued = root_was_enqueued;
 }
 
 void set_childrens_queued_status_on_parents(FileSystemEntry *parent, bool wanted_status)
@@ -587,6 +576,8 @@ void dequeue_song(FileSystemEntry *child)
                 delete_from_list(playlist, node2);
 
         child->is_enqueued = 0;
+
+        mark_as_dequeued(get_library(), child->full_path);
 }
 
 void dequeue_children(FileSystemEntry *parent)
@@ -794,6 +785,63 @@ static gchar *normalize_to_library_path(const char *path, FileSystemEntry *libra
         return canonicalized;
 }
 
+static gchar **m3u_resolve_paths(const char *filepath, FileSystemEntry *library, bool require_exists)
+{
+        GError *error = NULL;
+        gchar *contents;
+
+        char filename[KEW_PATH_MAX];
+        expand_path(filepath, filename, KEW_PATH_MAX);
+
+        if (!g_file_get_contents(filename, &contents, NULL, &error)) {
+                g_clear_error(&error);
+                return NULL;
+        }
+
+        gchar *directory = g_path_get_dirname(filename);
+        gchar **lines = g_strsplit(contents, "\n", -1);
+        GPtrArray *paths = g_ptr_array_new();
+
+        for (gint i = 0; lines[i] != NULL; i++) {
+                gchar *line = g_strdelimit(lines[i], "\r", '\0');
+                gchar *trimmed_line = g_strstrip(line);
+
+                if (trimmed_line[0] == '#' || trimmed_line[0] == '\0')
+                        continue;
+
+                gchar *songPath;
+
+                if (g_path_is_absolute(trimmed_line))
+                        songPath = g_strdup(trimmed_line);
+                else
+                        songPath = g_build_filename(directory, trimmed_line, NULL);
+
+                if (songPath == NULL)
+                        continue;
+
+                gchar *normalized = normalize_to_library_path(songPath, library);
+                g_free(songPath);
+
+                if (normalized == NULL)
+                        continue;
+
+                if (require_exists && exists_file(normalized) < 0) {
+                        g_free(normalized);
+                        continue;
+                }
+
+                g_ptr_array_add(paths, normalized);
+        }
+
+        g_ptr_array_add(paths, NULL);
+
+        g_free(directory);
+        g_strfreev(lines);
+        g_free(contents);
+
+        return (gchar **)g_ptr_array_free(paths, FALSE);
+}
+
 void enqueue_m3u(const char *filepath, FileSystemEntry *library,
                  Node **first_enqueued_node, bool dont_dequeue)
 {
@@ -802,99 +850,53 @@ void enqueue_m3u(const char *filepath, FileSystemEntry *library,
 
         bool root_was_enqueued = library->is_enqueued;
 
-        GError *error = NULL;
-        gchar *contents;
-
-        char filename[KEW_PATH_MAX];
-        expand_path(filepath, filename, KEW_PATH_MAX);
-
-        if (!g_file_get_contents(filename, &contents, NULL, &error)) {
-                g_clear_error(&error);
+        gchar **paths = m3u_resolve_paths(filepath, library, true);
+        if (paths == NULL)
                 return;
-        }
-
-        gchar *directory = g_path_get_dirname(filename);
-        gchar **lines = g_strsplit(contents, "\n", -1);
 
         int list_row_num = 1;
 
-        for (gint i = 0; lines[i] != NULL; i++) {
-                gchar *line = lines[i];
-
-                line = g_strdelimit(line, "\r", '\0');
-                gchar *trimmed_line = g_strstrip(line);
-
-                if (trimmed_line[0] == '#' || trimmed_line[0] == '\0')
-                        continue;
-
-                gchar *songPath;
-
-                if (g_path_is_absolute(trimmed_line)) {
-                        songPath = g_strdup(trimmed_line);
-                } else {
-                        songPath = g_build_filename(directory, trimmed_line, NULL);
-                }
-
-                if (songPath == NULL)
-                        continue;
-
-                gchar *normalized = normalize_to_library_path(songPath, library);
-                g_free(songPath);
-
-                if (normalized == NULL)
-                        continue;
-
-                if (exists_file(normalized) < 0) {
-                        g_free(normalized);
-                        continue;
-                }
+        for (gint i = 0; paths[i] != NULL; i++) {
+                gchar *normalized = paths[i];
 
                 Node *found = find_path_in_playlist(normalized, playlist);
 
                 if (dont_dequeue && found) {
                         if (*first_enqueued_node == NULL)
                                 *first_enqueued_node = found;
-                } else {
-
-                        // Don't add songs that are already enqueued
-                        if (find_path_in_playlist(normalized, playlist) != NULL) {
-                                g_free(normalized);
-                                continue;
-                        }
-
-                        int id = mark_as_enqueued(library, normalized, list_row_num);
-                        list_row_num++;
-
-                        if (id <= 0)
-                                id = increment_node_id();
-
-                        Node *node1 = NULL;
-                        create_node(&node1, normalized, id);
-                        if (add_to_list(unshuffled_playlist, node1) == -1) {
-                                destroy_node(node1);
-                                g_free(normalized);
-                                continue;
-                        }
-
-                        Node *node2 = NULL;
-                        create_node(&node2, normalized, id);
-                        if (add_to_list(playlist, node2) == -1)
-                                destroy_node(node2);
-
-
-                        if (*first_enqueued_node == NULL)
-                                *first_enqueued_node = node1;
+                        continue;
                 }
 
-                g_free(normalized);
+                // Don't add songs that are already enqueued
+                if (found != NULL)
+                        continue;
+
+                int id = mark_as_enqueued(library, normalized, list_row_num);
+                list_row_num++;
+
+                if (id <= 0)
+                        id = increment_node_id();
+
+                Node *node1 = NULL;
+                create_node(&node1, normalized, id);
+                if (add_to_list(unshuffled_playlist, node1) == -1) {
+                        destroy_node(node1);
+                        continue;
+                }
+
+                Node *node2 = NULL;
+                create_node(&node2, normalized, id);
+                if (add_to_list(playlist, node2) == -1)
+                        destroy_node(node2);
+
+                if (*first_enqueued_node == NULL)
+                        *first_enqueued_node = node1;
         }
 
         if (!root_was_enqueued)
                 library->is_enqueued = false;
 
-        g_free(directory);
-        g_strfreev(lines);
-        g_free(contents);
+        g_strfreev(paths);
 }
 
 void dequeue_m3u(const char *filepath, FileSystemEntry *library)
@@ -902,79 +904,84 @@ void dequeue_m3u(const char *filepath, FileSystemEntry *library)
         PlayList *unshuffled_playlist = get_unshuffled_playlist();
         PlayList *playlist = get_playlist();
 
-        GError *error = NULL;
-        gchar *contents;
-
-        char filename[KEW_PATH_MAX];
-        expand_path(filepath, filename, KEW_PATH_MAX);
-
-        if (!g_file_get_contents(filename, &contents, NULL, &error)) {
-                g_clear_error(&error);
+        gchar **paths = m3u_resolve_paths(filepath, library, false);
+        if (paths == NULL)
                 return;
-        }
 
-        gchar *directory = g_path_get_dirname(filename);
-        gchar **lines = g_strsplit(contents, "\n", -1);
+        for (gint i = 0; paths[i] != NULL; i++) {
+                gchar *normalized = paths[i];
 
-        for (gint i = 0; lines[i] != NULL; i++) {
-                gchar *line = lines[i];
-
-                line = g_strdelimit(line, "\r", '\0');
-                gchar *trimmed_line = g_strstrip(line);
-
-                if (trimmed_line[0] == '#' || trimmed_line[0] == '\0')
-                        continue;
-
-                gchar *songPath;
-
-                if (g_path_is_absolute(trimmed_line)) {
-                        songPath = g_strdup(trimmed_line);
-                } else {
-                        songPath = g_build_filename(directory, trimmed_line, NULL);
-                }
-
-                if (songPath == NULL)
-                        continue;
-
-                gchar *normalized = normalize_to_library_path(songPath, library);
-                g_free(songPath);
-
-                if (normalized == NULL)
-                        continue;
-
-                // Remove one instance of this path — symmetric with enqueue_m3u()
+                // Remove one instance of this path, symmetric with enqueue_m3u()
                 // which adds one node per path.
                 Node *node1 = find_last_path_in_playlist(normalized, unshuffled_playlist);
 
-                if (node1 != NULL) {
-                        Node *current = get_current_song();
+                if (node1 == NULL)
+                        continue;
 
-                        if (current != NULL && current->id == node1->id) {
-                                remove_currently_playing_song();
-                        } else {
-                                if (get_song_to_start_from() != NULL)
-                                        set_song_to_start_from(get_list_next(node1));
-                        }
+                Node *current = get_current_song();
 
-                        int id = node1->id;
-                        Node *node2 = find_selected_entry_by_id(playlist, id);
-
-                        delete_from_list(unshuffled_playlist, node1);
-
-                        if (node2 != NULL)
-                                delete_from_list(playlist, node2);
-
-                        // mark_as_dequeued() checks siblings before clearing
-                        // parent flags, so other enqueued entries are unaffected.
-                        mark_as_dequeued(library, normalized);
+                if (current != NULL && current->id == node1->id) {
+                        remove_currently_playing_song();
+                } else {
+                        if (get_song_to_start_from() != NULL)
+                                set_song_to_start_from(get_list_next(node1));
                 }
 
-                g_free(normalized);
+                int id = node1->id;
+                Node *node2 = find_selected_entry_by_id(playlist, id);
+
+                delete_from_list(unshuffled_playlist, node1);
+
+                if (node2 != NULL)
+                        delete_from_list(playlist, node2);
+
+                // mark_as_dequeued() checks siblings before clearing
+                // parent flags, so other enqueued entries are unaffected.
+                mark_as_dequeued(library, normalized);
         }
 
-        g_free(directory);
-        g_strfreev(lines);
-        g_free(contents);
+        g_strfreev(paths);
+}
+
+void refresh_m3u_children(FileSystemEntry *entry)
+{
+        if (!is_m3u_file(entry))
+                return;
+
+        free_children(entry);
+
+        FileSystemEntry *library = entry;
+        while (library->parent != NULL)
+                library = library->parent;
+
+        gchar **paths = m3u_resolve_paths(entry->full_path, library, true);
+        if (paths == NULL)
+                return;
+
+        PlayList *playlist = get_playlist();
+
+        for (gint i = 0; paths[i] != NULL; i++) {
+                FileSystemEntry *child = append_virtual_child(entry, paths[i]);
+
+                if (child != NULL && playlist != NULL && find_path_in_playlist(paths[i], playlist) != NULL)
+                        child->is_enqueued = 1;
+        }
+
+        g_strfreev(paths);
+}
+
+void attach_m3u_children(FileSystemEntry *root)
+{
+        if (root == NULL)
+                return;
+
+        if (is_m3u_file(root)) {
+                refresh_m3u_children(root);
+                return;
+        }
+
+        for (FileSystemEntry *child = root->children; child != NULL; child = child->next)
+                attach_m3u_children(child);
 }
 
 bool found_last_parent = false;

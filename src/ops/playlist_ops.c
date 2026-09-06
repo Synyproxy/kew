@@ -1096,7 +1096,9 @@ static void set_playlist_name(const char *name)
                 const char *next = g_utf8_next_char(p);
                 char ch[5] = {0};
                 memcpy(ch, p, (size_t)(next - p));
-                if (add_to_playlist_name(ch) <= 0)
+                int before = num_playlist_name_letters;
+                add_to_playlist_name(ch);
+                if (num_playlist_name_letters == before)
                         break;
                 p = next;
         }
@@ -1134,6 +1136,8 @@ void playlist_save(void)
 
         if (existing != NULL) {
                 write_m3u_file(existing->full_path, playlist);
+                refresh_m3u_children(existing);
+                set_dirty(DIRTY_LIBRARY);
                 snprintf(message, sizeof(message), "Saved queue to %s.", name);
         } else {
                 export_current_playlist(model->settings.path, playlist, model->state.ui.playlist_name);
@@ -1193,6 +1197,7 @@ void set_add_to_playlist_mode(void)
 
         if (path == NULL) {
                 set_error_message("Select a song or folder first.");
+                set_dirty(DIRTY_FOOTER);
                 return;
         }
 
@@ -1281,6 +1286,11 @@ static void add_pending_entry_to_playlist(void)
 
         int added = playlist_file_add_entry(target, entry);
 
+        if (added > 0 && existing != NULL) {
+                refresh_m3u_children(existing);
+                set_dirty(DIRTY_LIBRARY);
+        }
+
         if (added < 0)
                 snprintf(message, sizeof(message), "Could not write %s.", target);
         else if (added == 0)
@@ -1291,12 +1301,48 @@ static void add_pending_entry_to_playlist(void)
         set_error_message(message);
 }
 
+static bool remove_track_from_playlist(FileSystemEntry *track)
+{
+        Model *model = get_model();
+        FileSystemEntry *playlist_entry = track->parent;
+        char message[KEW_NAME_MAX * 2 + 64];
+        char stem[KEW_NAME_MAX];
+        bool was_last = track->next == NULL;
+
+        playlist_stem(playlist_entry->full_path, stem, sizeof(stem));
+
+        if (!playlist_file_remove_path(playlist_entry->full_path, track->full_path)) {
+                snprintf(message, sizeof(message), "Could not remove the track from %s.", stem);
+                set_error_message(message);
+                return true;
+        }
+
+        snprintf(message, sizeof(message), "Removed %s from %s.", track->name, stem);
+        set_error_message(message);
+
+        model->state.ui.current_lib_entry = NULL;
+        refresh_m3u_children(playlist_entry);
+
+        if (was_last && model->state.ui.chosen_lib_row > 0)
+                model->state.ui.chosen_lib_row--;
+
+        set_dirty(DIRTY_LIBRARY);
+
+        return true;
+}
+
 bool request_playlist_delete(void)
 {
         Model *model = get_model();
         FileSystemEntry *entry = model->state.ui.current_lib_entry;
 
-        if (model->state.currentView != LIBRARY_VIEW || !is_m3u_file(entry))
+        if (model->state.currentView != LIBRARY_VIEW || entry == NULL)
+                return false;
+
+        if (entry->parent != NULL && is_m3u_file(entry->parent))
+                return remove_track_from_playlist(entry);
+
+        if (!is_m3u_file(entry))
                 return false;
 
         snprintf(model->state.ui.pending_delete_path, sizeof(model->state.ui.pending_delete_path), "%s", entry->full_path);
