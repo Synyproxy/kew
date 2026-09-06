@@ -1868,12 +1868,14 @@ ComponentMsg component_library_header(const Model *model, k_Rect region, DrawBuf
                          get_binding_string(MSG_ENQUEUEANDPLAY, true));
 
 #ifndef __APPLE__
-                snprintf(line2, sizeof(line2), _(" Scroll:Fn+↑/↓. Update:%s. Sort:%s."),
+                snprintf(line2, sizeof(line2), _(" Scroll:Fn+↑/↓. Update:%s. Sort:%s. Add to playlist:%s. Delete:%s."),
 #else
-                snprintf(line2, sizeof(line2), _(" Scroll:PgUp/PgDn. Update:%s. Sort:%s."),
+                snprintf(line2, sizeof(line2), _(" Scroll:PgUp/PgDn. Update:%s. Sort:%s. Add to playlist:%s. Delete:%s."),
 #endif
                          get_binding_string(MSG_UPDATELIBRARY, true),
-                         get_binding_string(MSG_SORTLIBRARY, true));
+                         get_binding_string(MSG_SORTLIBRARY, true),
+                         get_binding_string(MSG_ADDTOPLAYLIST, true),
+                         get_binding_string(MSG_REMOVE, true));
 
                 draw_buffer_set_string(buf, row, col, line1, style);
                 draw_buffer_set_string(buf, row + 1, col, line2, style);
