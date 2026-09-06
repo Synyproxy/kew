@@ -252,7 +252,7 @@ Node *enqueue_playlist(FileSystemEntry *entry, bool dont_dequeue)
 
         bool queue_was_empty = playlist->count == 0;
 
-        if (!entry->is_enqueued) {
+        if (!entry->is_enqueued || has_dequeued_children(entry)) {
                 set_next_song(NULL);
                 ps->nextSongNeedsRebuilding = true;
 
@@ -283,6 +283,11 @@ Node *enqueue_playlist(FileSystemEntry *entry, bool dont_dequeue)
         reset_list_after_dequeuing_playing_song();
 
         pthread_mutex_unlock(&(playlist->mutex));
+
+        if (state->currentView == LIBRARY_VIEW && entry->children != NULL) {
+                state->ui.treeCtx.chosen_dir = state->ui.chosen_dir = entry;
+                state->ui.allowChooseSongs = true;
+        }
 
         set_dirty(DIRTY_ALL);
 

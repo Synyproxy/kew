@@ -85,6 +85,9 @@ static void collect_entries(FileSystemEntry *node, EntryArray *arr)
 
         entry_array_push(arr, node);
 
+        if (is_m3u_file(node))
+                return; // playlist tracks are rebuilt from the .m3u on load
+
         for (FileSystemEntry *child = node->children; child; child = child->next)
                 collect_entries(child, arr);
 }
@@ -233,6 +236,51 @@ FileSystemEntry *create_entry(const char *name, int is_directory,
                 }
         }
         return new_entry;
+}
+
+FileSystemEntry *append_virtual_child(FileSystemEntry *parent, const char *full_path)
+{
+        if (parent == NULL || full_path == NULL)
+                return NULL;
+
+        const char *base = strrchr(full_path, '/');
+        base = base ? base + 1 : full_path;
+
+        FileSystemEntry *child = create_entry(base, 0, parent, 0);
+        if (child == NULL)
+                return NULL;
+
+        child->full_path = strdup(full_path);
+        child->track_number = 0;
+        child->disc_number = 0;
+        child->lastChild = NULL;
+
+        if (child->full_path == NULL) {
+                free(child->name);
+                free(child);
+                return NULL;
+        }
+
+        if (parent->children == NULL) {
+                parent->children = child;
+        } else {
+                FileSystemEntry *tail = parent->children;
+                while (tail->next != NULL)
+                        tail = tail->next;
+                tail->next = child;
+        }
+
+        return child;
+}
+
+void free_children(FileSystemEntry *parent)
+{
+        if (parent == NULL || parent->children == NULL)
+                return;
+
+        free_tree(parent->children);
+        parent->children = NULL;
+        parent->lastChild = NULL;
 }
 
 void add_child(FileSystemEntry *parent, FileSystemEntry *child)
@@ -939,6 +987,9 @@ FileSystemEntry *read_tree_from_binary(
                 if (disk_entries[i].id > max_id)
                         max_id = disk_entries[i].id;
 
+        if (max_id > last_used_id)
+                last_used_id = max_id;
+
         FileSystemEntry **nodes = calloc((size_t)max_id + 1, sizeof(FileSystemEntry *));
         if (!nodes) {
                 free(disk_entries);
@@ -1211,7 +1262,8 @@ void fuzzy_search_recursive(FileSystemEntry *node, const char *search_term,
         g_free(lower_search_term);
         g_free(lower_name);
 
-        fuzzy_search_recursive(node->children, search_term, threshold, callback);
+        if (!is_m3u_file(node))
+                fuzzy_search_recursive(node->children, search_term, threshold, callback);
         fuzzy_search_recursive(node->next, search_term, threshold, callback);
 }
 

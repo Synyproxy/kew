@@ -268,6 +268,19 @@ void enqueue_m3u(const char *filepath, FileSystemEntry *library,
  */
 void dequeue_m3u(const char *filepath, FileSystemEntry *library);
 
+/**
+ * @brief Rebuilds the child entries of a playlist from its .m3u file.
+ *
+ * Each existing track in the file becomes a file entry under the playlist so
+ * the library browser can show and enqueue individual tracks.
+ */
+void refresh_m3u_children(FileSystemEntry *entry);
+
+/**
+ * @brief Calls refresh_m3u_children() on every playlist in the tree.
+ */
+void attach_m3u_children(FileSystemEntry *root);
+
 void library_shutdown(void);
 
 int determine_depth(FileSystemEntry *entry);

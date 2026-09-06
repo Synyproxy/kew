@@ -64,6 +64,20 @@ typedef void (*SlowloadingCallback)(void);
 FileSystemEntry *create_directory_tree(const char *start_path, int *num_entries);
 
 /**
+ * Appends a file entry that is not backed by the directory scan, e.g. a
+ * track listed in a playlist. The entry gets the basename of @p full_path
+ * as its name and is placed last among the parent's children.
+ *
+ * @return The new entry, or NULL on allocation failure.
+ */
+FileSystemEntry *append_virtual_child(FileSystemEntry *parent, const char *full_path);
+
+/**
+ * Frees all children of @p parent and leaves it childless.
+ */
+void free_children(FileSystemEntry *parent);
+
+/**
  * Frees an entire FileSystemEntry tree.
  *
  * Iteratively traverses the tree and releases all associated memory,
