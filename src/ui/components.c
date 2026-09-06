@@ -15,6 +15,7 @@
 #include "data/img_func.h"
 
 #include "ops/library_ops.h"
+#include "loader/tagLibWrapper.h"
 #include "ops/playback_state.h"
 #include "ops/playlist_ops.h"
 
@@ -141,6 +142,9 @@ static void draw_search_row(DrawBuffer *buf, int row, int col, int width,
                                          rest, width - (reverse_col - col),
                                          is_chosen ? rev_style : name_style);
 }
+
+#define MIN_WIDTH_FOR_DURATION 28
+#define DURATION_COLUMN_WIDTH 6 // "9h 59m"
 
 int calc_indentation(int depth)
 {
@@ -534,6 +538,30 @@ static FileSystemEntry *component_library_helper_render_node(const Model *model,
                         if (name_width < 0)
                                 name_width = 0;
 
+                        // Song length, right-aligned in its own column
+                        char duration_text[16] = "";
+                        int duration_col = -1;
+
+                        if (!entry->is_directory && !is_m3u_file(entry) &&
+                            region.width >= MIN_WIDTH_FOR_DURATION && is_music_file(entry->name)) {
+                                format_duration_short(entry_duration_seconds(entry), duration_text, sizeof(duration_text));
+
+                                if (duration_text[0] != '\0') {
+                                        int duration_len = utf8_display_width(duration_text);
+                                        int column_width = duration_len > DURATION_COLUMN_WIDTH ? duration_len : DURATION_COLUMN_WIDTH;
+                                        int end_col = region.col + region.width - 2; // stays clear of the scrollbar
+                                        int name_end = end_col - column_width - 1;
+                                        int available = name_end - (draw_col + extra_indent + prefix_len + 3); // 3 = "└─ "
+
+                                        duration_col = end_col - duration_len;
+
+                                        if (available < name_width)
+                                                name_width = available;
+                                        if (name_width < 0)
+                                                name_width = 0;
+                                }
+                        }
+
                         char dir_name[256];
                         char orig_name[256];
                         dir_name[0] = '\0';
@@ -640,6 +668,13 @@ static FileSystemEntry *component_library_helper_render_node(const Model *model,
                                         process_name_scroll(model, entry->name, filename, name_width, strip_unneeded_chars, strip_suffix);
 
                                 draw_buffer_set_string_truncated(buf, draw_row, text_col, filename, name_width, file_style);
+
+                                if (duration_col >= 0) {
+                                        CellStyle duration_style = item_style;
+                                        duration_style.attrs &= ~(ATTR_REVERSE | ATTR_UNDERLINE);
+                                        duration_style.attrs |= ATTR_DIM;
+                                        draw_buffer_set_string(buf, draw_row, duration_col, duration_text, duration_style);
+                                }
                         }
 
                         (*row_count)++;
@@ -1737,6 +1772,34 @@ ComponentMsg component_playlist_rows(const Model *model, k_Rect region, DrawBuff
                 if (max_name_width < 0)
                         max_name_width = 0;
 
+                // Song length, right-aligned in its own column
+                char duration_text[16] = "";
+                int duration_col = -1;
+
+                if (region.width >= MIN_WIDTH_FOR_DURATION && is_music_file(buffer)) {
+                        if (node->song.duration == 0.0) {
+                                int seconds = getDurationSeconds(node->song.file_path);
+                                node->song.duration = (seconds > 0) ? (double)seconds : -1.0;
+                        }
+
+                        if (node->song.duration > 0.0)
+                                format_duration_short((int)(node->song.duration + 0.5), duration_text, sizeof(duration_text));
+
+                        if (duration_text[0] != '\0') {
+                                int duration_len = utf8_display_width(duration_text);
+                                int column_width = duration_len > DURATION_COLUMN_WIDTH ? duration_len : DURATION_COLUMN_WIDTH;
+                                int end_col = region.col + region.width - 2; // stays clear of the scrollbar
+                                int available = end_col - column_width - 1 - col;
+
+                                duration_col = end_col - duration_len;
+
+                                if (available < max_name_width)
+                                        max_name_width = available;
+                                if (max_name_width < 0)
+                                        max_name_width = 0;
+                        }
+                }
+
                 chosen_name_len = process_name(buffer, filename, max_name_width, true, true);
 
                 int is_chosen = false;
@@ -1786,7 +1849,13 @@ ComponentMsg component_playlist_rows(const Model *model, k_Rect region, DrawBuff
                 if (is_playing && !is_chosen)
                         title_style.attrs |= ATTR_UNDERLINE;
 
-                draw_buffer_set_string_truncated(buf, draw_row, col, filename, region.width, title_style);
+                draw_buffer_set_string_truncated(buf, draw_row, col, filename, max_name_width, title_style);
+
+                if (duration_col >= 0) {
+                        CellStyle duration_style = rownum_style;
+                        duration_style.attrs |= ATTR_DIM;
+                        draw_buffer_set_string(buf, draw_row, duration_col, duration_text, duration_style);
+                }
 
                 node = node->next;
                 printed++;

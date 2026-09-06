@@ -343,6 +343,13 @@ int get_minicontrols_text(char *text, size_t size, MinicontrolMode mode);
  */
 int utf8_display_width(const char *s);
 
+/**
+ * @brief Formats a duration compactly: "4m" or "1h 5m". Seconds are
+ * rounded to the nearest minute, and anything shorter than a minute
+ * shows as "1m". Writes an empty string when seconds <= 0.
+ */
+void format_duration_short(int seconds, char *out, size_t out_size);
+
 void draw_link_to_buffer(DrawBuffer *buf, int row, int col, int width,
                          const char *url, char *title, CellStyle style);
 

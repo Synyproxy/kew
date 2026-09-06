@@ -1627,6 +1627,26 @@ void getTrackInfo(const char *filepath, uint32_t *track, uint32_t *disc)
         return;
 }
 
+int getDurationSeconds(const char *filepath)
+{
+        if (filepath == NULL)
+                return 0;
+
+#ifdef _WIN32
+        std::wstring wpath = utf8ToWide(filepath);
+        TagLib::FileRef file(wpath.c_str(), true, TagLib::AudioProperties::Fast);
+#else
+        TagLib::FileRef file(filepath, true, TagLib::AudioProperties::Fast);
+#endif
+
+        if (file.isNull() || !file.audioProperties())
+                return 0;
+
+        int seconds = file.audioProperties()->lengthInSeconds();
+
+        return seconds > 0 ? seconds : 0;
+}
+
 static std::string getComment(TagLib::File *file)
 {
         if (!file)

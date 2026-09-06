@@ -66,6 +66,15 @@ int extractTags(const char *input_file, TagSettings *tag_settings,
  */
 void getTrackInfo(const char *filepath, uint32_t* track, uint32_t* disc);
 
+/*
+ * @brief Reads only the audio length of a file, skipping tag parsing work
+ * where possible.
+ *
+ * @param filepath full file path
+ * @return Length in whole seconds, or 0 if it could not be determined
+ */
+int getDurationSeconds(const char *filepath);
+
 
 #ifdef __cplusplus
 }

@@ -1032,6 +1032,29 @@ CellStyle cell_style_from_theme(ColorValue theme)
         return style;
 }
 
+void format_duration_short(int seconds, char *out, size_t out_size)
+{
+        if (out == NULL || out_size == 0)
+                return;
+
+        out[0] = '\0';
+
+        if (seconds <= 0)
+                return;
+
+        int minutes = (seconds + 30) / 60;
+        if (minutes < 1)
+                minutes = 1;
+
+        int hours = minutes / 60;
+        minutes %= 60;
+
+        if (hours > 0)
+                snprintf(out, out_size, "%dh %dm", hours, minutes);
+        else
+                snprintf(out, out_size, "%dm", minutes);
+}
+
 int utf8_display_width(const char *s)
 {
         wchar_t *ws;

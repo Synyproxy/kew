@@ -34,6 +34,7 @@ typedef struct FileSystemEntry {
         struct FileSystemEntry *lastChild; // TEMP: only for construction
 
         time_t mtime;
+        int duration; // Seconds. 0 = not read yet, -1 = could not be read
 } FileSystemEntry;
 #endif
 
@@ -141,16 +142,24 @@ void fuzzy_search_recursive(FileSystemEntry *node,
                             void (*callback)(FileSystemEntry *, int));
 
 /**
- * Copies the is_enqueued status from one tree to another.
+ * Copies the is_enqueued status and cached durations from one tree to
+ * another.
  *
- * Traverses the source library tree and propagates the
- * is_enqueued flag to corresponding entries in the
+ * Traverses the source library tree and propagates the is_enqueued
+ * flag and any already-read duration to corresponding entries in the
  * target tree based on full path matching.
  *
  * @param library  Source tree containing the enqueue states
  * @param tmp      Target tree to receive the enqueue states
  */
 void copy_is_enqueued(FileSystemEntry *library, FileSystemEntry *tmp);
+
+/**
+ * Returns the duration of a music file in seconds, reading it from the
+ * file on first use and caching it in the entry. Returns 0 when the
+ * duration is unknown.
+ */
+int entry_duration_seconds(FileSystemEntry *entry);
 
 /**
  * Sorts a FileSystemEntry tree recursively.

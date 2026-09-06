@@ -18,6 +18,7 @@
 #include "utils/file.h"
 #include "utils/utils.h"
 #include "utils/k_log.h"
+#include "loader/tagLibWrapper.h"
 
 #include <dirent.h>
 #include <glib.h>
@@ -33,7 +34,7 @@
 #define FSDB_MAGIC 0x46534442 // "FSDB"
 
 static int last_used_id = 0;
-static uint32_t DB_VERSION = 5;
+static uint32_t DB_VERSION = 6;
 
 // Header for the DB
 typedef struct {
@@ -54,6 +55,7 @@ typedef struct {
         int32_t is_enqueued;
         uint32_t name_offset;
         uint64_t mtime;
+        int32_t duration;
 } FileSystemEntryDisk;
 
 typedef struct {
@@ -145,6 +147,7 @@ int write_tree_to_binary(FileSystemEntry *root, const char *filename)
                 d->is_directory = n->is_directory;
                 d->is_enqueued = n->is_enqueued;
                 d->mtime = (uint64_t)n->mtime;
+                d->duration = n->duration;
 
                 if (n->name) {
                         d->name_offset = (uint32_t)offset;
@@ -224,6 +227,11 @@ FileSystemEntry *create_entry(const char *name, int is_directory,
                 new_entry->is_directory = is_directory;
                 new_entry->is_enqueued = 0;
                 new_entry->mtime = mtime;
+                new_entry->duration = 0;
+                new_entry->track_number = 0;
+                new_entry->disc_number = 0;
+                new_entry->full_path = NULL;
+                new_entry->lastChild = NULL;
                 new_entry->parent = parent;
                 new_entry->children = NULL;
                 new_entry->next = NULL;
@@ -1015,6 +1023,9 @@ FileSystemEntry *read_tree_from_binary(
                 n->parent_id = d->parent_id;
                 n->is_directory = d->is_directory;
                 n->mtime = (time_t)d->mtime;
+                n->duration = d->duration;
+                n->track_number = 0;
+                n->disc_number = 0;
 
                 if (set_enqueued_status) {
                         n->is_enqueued = d->is_enqueued;
@@ -1305,17 +1316,32 @@ void copy_is_enqueued(FileSystemEntry *library, FileSystemEntry *tmp)
         if (library == NULL)
                 return;
 
-        if (library->is_enqueued) {
+        if (library->is_enqueued || library->duration > 0) {
                 FileSystemEntry *tmp_entry =
                     find_corresponding_entry(tmp, library->full_path);
                 if (tmp_entry != NULL) {
                         tmp_entry->is_enqueued = library->is_enqueued;
+                        if (library->duration > 0 && tmp_entry->duration <= 0)
+                                tmp_entry->duration = library->duration;
                 }
         }
 
         copy_is_enqueued(library->children, tmp);
 
         copy_is_enqueued(library->next, tmp);
+}
+
+int entry_duration_seconds(FileSystemEntry *entry)
+{
+        if (entry == NULL || entry->is_directory || entry->full_path == NULL)
+                return 0;
+
+        if (entry->duration == 0) {
+                int seconds = getDurationSeconds(entry->full_path);
+                entry->duration = (seconds > 0) ? seconds : -1;
+        }
+
+        return (entry->duration > 0) ? entry->duration : 0;
 }
 
 int compare_folders_by_age_files_alphabetically(const void *a, const void *b)
