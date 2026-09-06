@@ -319,6 +319,18 @@ void playlist_prompt_confirm(void);
  */
 void playlist_prompt_cancel(void);
 
+/**
+ * @brief Asks for confirmation before deleting the playlist file under the cursor.
+ *
+ * @return true if the library cursor was on a playlist and the prompt opened.
+ */
+bool request_playlist_delete(void);
+
+/**
+ * @brief Deletes the playlist file the user confirmed and requests a library update.
+ */
+void delete_pending_playlist(void);
+
 char *get_playlist_name(void);
 
 #endif

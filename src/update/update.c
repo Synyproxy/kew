@@ -666,6 +666,11 @@ UpdateResult update(Model *model, struct Msg *msg)
                 break;
 
         case MSG_NAMING_PLAYLIST:
+                if (!model->state.ui.naming_playlist && model->state.ui.delete_playlist_confirmed) {
+                        model->state.ui.delete_playlist_confirmed = false;
+                        result.cmd.type = CMD_DELETE_PLAYLIST;
+                        break;
+                }
                 if (!model->state.ui.naming_playlist && model->state.ui.request_library_update) {
                         model->state.ui.request_library_update = false;
                         dispatch_msg((struct Msg){.type = MSG_UPDATELIBRARY});
@@ -695,6 +700,8 @@ UpdateResult update(Model *model, struct Msg *msg)
                 component_playlist_helper_update_view_state(model, true);
                 break;
         case MSG_REMOVE:
+                if (request_playlist_delete())
+                        break;
                 result.cmd.type = CMD_REMOVE;
                 break;
 

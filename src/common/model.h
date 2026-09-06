@@ -440,7 +440,8 @@ typedef struct {
 typedef enum {
         PROMPT_NONE,
         PROMPT_SAVE_PLAYLIST,
-        PROMPT_ADD_TO_PLAYLIST
+        PROMPT_ADD_TO_PLAYLIST,
+        PROMPT_CONFIRM_DELETE
 } PromptKind;
 
 typedef struct {
@@ -540,6 +541,8 @@ typedef struct
         bool naming_playlist;
         PromptKind prompt_kind;
         char pending_add_path[KEW_PATH_MAX];
+        char pending_delete_path[KEW_PATH_MAX];
+        bool delete_playlist_confirmed;
         bool request_library_update;
         bool play_pause_toggled;
         bool last_pause_state;

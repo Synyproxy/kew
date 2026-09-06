@@ -306,6 +306,19 @@ void run_command(UpdateResult result)
                 set_add_to_playlist_mode();
                 break;
 
+        case CMD_DELETE_PLAYLIST: {
+                FileSystemEntry *entry = find_corresponding_entry(get_library(), model->state.ui.pending_delete_path);
+                if (entry && entry->is_enqueued)
+                        enqueue_playlist(entry, false);
+                delete_pending_playlist();
+                model->songdata = get_current_song_data(model->songdata);
+                if (model->state.ui.request_library_update) {
+                        model->state.ui.request_library_update = false;
+                        dispatch_msg((struct Msg){.type = MSG_UPDATELIBRARY});
+                }
+                break;
+        }
+
         case CMD_SAVEPLAYLIST: {
                 set_save_playlist_mode();
                 break;
