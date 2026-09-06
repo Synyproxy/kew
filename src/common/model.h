@@ -542,6 +542,7 @@ typedef struct
         PromptKind prompt_kind;
         char pending_add_path[KEW_PATH_MAX];
         char pending_delete_path[KEW_PATH_MAX];
+        char source_playlist_path[KEW_PATH_MAX];
         bool delete_playlist_confirmed;
         bool request_library_update;
         bool play_pause_toggled;

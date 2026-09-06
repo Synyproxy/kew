@@ -250,12 +250,17 @@ Node *enqueue_playlist(FileSystemEntry *entry, bool dont_dequeue)
 
         pthread_mutex_lock(&(playlist->mutex));
 
+        bool queue_was_empty = playlist->count == 0;
+
         if (!entry->is_enqueued) {
                 set_next_song(NULL);
                 ps->nextSongNeedsRebuilding = true;
 
                 enqueue_m3u(entry->full_path, get_library(), &first_enqueued_node, dont_dequeue);
                 entry->is_enqueued = 1;
+
+                if (queue_was_empty)
+                        snprintf(state->ui.source_playlist_path, sizeof(state->ui.source_playlist_path), "%s", entry->full_path);
         } else if (!dont_dequeue) {
                 set_next_song(NULL);
                 ps->nextSongNeedsRebuilding = true;
