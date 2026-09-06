@@ -666,9 +666,14 @@ UpdateResult update(Model *model, struct Msg *msg)
                 break;
 
         case MSG_NAMING_PLAYLIST:
-                if (!model->state.ui.naming_playlist) {
+                if (!model->state.ui.naming_playlist && model->state.ui.request_library_update) {
+                        model->state.ui.request_library_update = false;
                         dispatch_msg((struct Msg){.type = MSG_UPDATELIBRARY});
                 }
+                break;
+
+        case MSG_ADDTOPLAYLIST:
+                result.cmd.type = CMD_ADD_TO_PLAYLIST;
                 break;
 
         case MSG_UPDATELIBRARY:
