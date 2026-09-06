@@ -7,7 +7,8 @@ There must be exactly one kew on this machine, and it is
 
 - `kew` on PATH resolves to `~/.local/bin/kew`.
 - Super+F5 runs `~/.config/hypr/hyprland/scripts/music.sh`, which launches
-  `~/.local/bin/kew` explicitly inside kitty on the `special:music` workspace.
+  `~/.local/bin/kew` explicitly inside kitty as a pinned floating window; when
+  hidden it is parked on the `special:music` workspace.
 - The Arch package (`/usr/bin/kew`) was removed. Do not reinstall it.
 
 `./kew` in this repo is only the compiler output. It is not a second
