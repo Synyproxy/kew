@@ -234,6 +234,7 @@ void clear_playlist(void)
                 }
         }
         clear_all_m3u_enqueued_flags(get_library());
+        state->ui.source_playlist_path[0] = '\0';
         pthread_mutex_unlock(&(playlist->mutex));
 
         PlaybackState *ps = get_playback_state();
@@ -1111,26 +1112,52 @@ static void close_prompt(void)
         set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
 }
 
+static FileSystemEntry *find_playlist_by_name(const char *name);
+
 void playlist_save(void)
 {
         Model *model = get_model();
         PlayList *playlist = get_playlist();
+        const char *name = model->state.ui.playlist_name;
+        char message[MAX_PLAYLIST_NAME_LEN * 4 + 64];
 
         if (num_playlist_name_letters < min_playlist_name_letters)
                 return;
 
-        export_current_playlist(model->settings.path, playlist, model->state.ui.playlist_name);
+        if (playlist->head == NULL) {
+                set_error_message("The queue is empty, nothing to save.");
+                close_prompt();
+                return;
+        }
 
-        model->state.ui.request_library_update = true;
+        FileSystemEntry *existing = find_playlist_by_name(name);
 
+        if (existing != NULL) {
+                write_m3u_file(existing->full_path, playlist);
+                snprintf(message, sizeof(message), "Saved queue to %s.", name);
+        } else {
+                export_current_playlist(model->settings.path, playlist, model->state.ui.playlist_name);
+                snprintf(message, sizeof(message), "Created playlist %s.", name);
+                model->state.ui.request_library_update = true;
+        }
+
+        set_error_message(message);
         close_prompt();
 }
 
 void set_save_playlist_mode(void)
 {
         Model *model = get_model();
+        const char *source = model->state.ui.source_playlist_path;
 
-        set_playlist_name(NULL);
+        if (source[0] != '\0' && exists_file(source) >= 0) {
+                char stem[KEW_NAME_MAX];
+                playlist_stem(source, stem, sizeof(stem));
+                set_playlist_name(stem);
+        } else {
+                set_playlist_name(NULL);
+        }
+
         model->state.ui.naming_playlist = true;
         model->state.ui.prompt_kind = PROMPT_SAVE_PLAYLIST;
         playlist_pick_index = -1;

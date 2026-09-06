@@ -823,6 +823,7 @@ void state_init(void)
         state->ui.prompt_kind = PROMPT_NONE;
         state->ui.pending_add_path[0] = '\0';
         state->ui.pending_delete_path[0] = '\0';
+        state->ui.source_playlist_path[0] = '\0';
         state->ui.delete_playlist_confirmed = false;
         state->ui.request_library_update = false;
         state->ui.playlist_scrollbar.position = 0;
