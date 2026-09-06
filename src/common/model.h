@@ -437,6 +437,12 @@ typedef struct {
         int previous_chosen_row;
 } TreeContext;
 
+typedef enum {
+        PROMPT_NONE,
+        PROMPT_SAVE_PLAYLIST,
+        PROMPT_ADD_TO_PLAYLIST
+} PromptKind;
+
 typedef struct {
         PixelData colors[16];
         int count;
@@ -532,6 +538,9 @@ typedef struct
         bool rendered;
         bool resumed_in_background;
         bool naming_playlist;
+        PromptKind prompt_kind;
+        char pending_add_path[KEW_PATH_MAX];
+        bool request_library_update;
         bool play_pause_toggled;
         bool last_pause_state;
         bool last_stop_state;

@@ -102,6 +102,7 @@ TBKeyBinding key_bindings[MAX_KEY_BINDINGS] = {
     // Playlist actions
     {0, 'x', 0, MSG_SAVEPLAYLIST, ""},
     {0, '.', 0, MSG_ADDTOFAVORITESPLAYLIST, ""},
+    {0, 'a', TB_MOD_SHIFT, MSG_ADDTOPLAYLIST, ""},
     {0, 'u', 0, MSG_UPDATELIBRARY, ""},
     {0, 'f', 0, MSG_MOVESONGUP, ""},
     {0, 'g', 0, MSG_MOVESONGDOWN, ""},
@@ -742,6 +743,7 @@ static const EventMap event_map[] = {
     {"cycleVisualizerMode", MSG_CYCLEVISUALIZERMODE},
     {"toggleAscii", MSG_TOGGLEASCII},
     {"addToFavorites_playlist", MSG_ADDTOFAVORITESPLAYLIST},
+    {"addToPlaylist", MSG_ADDTOPLAYLIST},
     {"deleteFromMainPlaylist", MSG_DELETEFROMMAINPLAYLIST},
     {"exportPlaylist", MSG_SAVEPLAYLIST},
     {"updateLibrary", MSG_UPDATELIBRARY},

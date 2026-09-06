@@ -1537,8 +1537,11 @@ ComponentMsg component_error_row(const Model *model, k_Rect region, DrawBuffer *
         if (model->state.ui.naming_playlist) {
                 style = cell_style_from_theme(ui->theme.status_info);
 
-                char msg[256];
-                snprintf(msg, sizeof(msg), "Playlist name: %s█", get_playlist_name());
+                char msg[512];
+                if (model->state.ui.prompt_kind == PROMPT_ADD_TO_PLAYLIST)
+                        snprintf(msg, sizeof(msg), _("Add to playlist: %s█  (Tab: next playlist, Enter: add, Esc: cancel)"), get_playlist_name());
+                else
+                        snprintf(msg, sizeof(msg), _("Playlist name: %s█  (Tab: existing playlists, Esc: cancel)"), get_playlist_name());
                 draw_buffer_set_string_truncated(buf, region.row, region.col,
                                                  msg, region.width, style);
                 return (ComponentMsg){0};
@@ -3106,6 +3109,8 @@ ComponentMsg component_help(const Model *model, k_Rect region, DrawBuffer *buf,
                   get_binding_string(MSG_SAVEPLAYLIST, false));
         HELP_LINE(_(" · Add Song To 'kew favorites.m3u': %s (run with 'kew .')"),
                   get_binding_string(MSG_ADDTOFAVORITESPLAYLIST, false));
+        HELP_LINE(_(" · Add Song/Folder To A Playlist In Library: %s"),
+                  get_binding_string(MSG_ADDTOPLAYLIST, false));
 
 #undef HELP_LINE
 

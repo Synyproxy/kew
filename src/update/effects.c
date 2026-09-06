@@ -302,6 +302,10 @@ void run_command(UpdateResult result)
                 add_to_favorites_playlist();
                 break;
 
+        case CMD_ADD_TO_PLAYLIST:
+                set_add_to_playlist_mode();
+                break;
+
         case CMD_SAVEPLAYLIST: {
                 set_save_playlist_mode();
                 break;

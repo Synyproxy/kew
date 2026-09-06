@@ -820,6 +820,9 @@ void state_init(void)
         state->ui.metadata_switched = 0;
         state->ui.decoder_switched = 0;
         state->ui.naming_playlist = false;
+        state->ui.prompt_kind = PROMPT_NONE;
+        state->ui.pending_add_path[0] = '\0';
+        state->ui.request_library_update = false;
         state->ui.playlist_scrollbar.position = 0;
         state->ui.playlist_scrollbar.last_position = 0;
         state->ui.library_scrollbar.position = 0;

@@ -8,6 +8,7 @@
  */
 
 #include "playlist_ops.h"
+#include "playlist_edit_ops.h"
 
 #include "common/common.h"
 #include "common/model.h"
@@ -36,6 +37,8 @@ static bool skip_in_progress = false;
 static int num_playlist_name_letters = 0;
 static int num_playlist_name_bytes = 0;
 static int min_playlist_name_letters = 1;
+static FileSystemEntry *library_playlists[MAX_LIBRARY_PLAYLISTS];
+static int playlist_pick_index = -1;
 
 Node *choose_next_song(void)
 {
@@ -1077,6 +1080,37 @@ int remove_from_playlist_name(void)
         return 0;
 }
 
+static void set_playlist_name(const char *name)
+{
+        Model *model = get_model();
+
+        num_playlist_name_letters = 0;
+        num_playlist_name_bytes = 0;
+        model->state.ui.playlist_name[0] = '\0';
+
+        if (name == NULL)
+                return;
+
+        for (const char *p = name; *p != '\0';) {
+                const char *next = g_utf8_next_char(p);
+                char ch[5] = {0};
+                memcpy(ch, p, (size_t)(next - p));
+                if (add_to_playlist_name(ch) <= 0)
+                        break;
+                p = next;
+        }
+}
+
+static void close_prompt(void)
+{
+        Model *model = get_model();
+
+        model->state.ui.naming_playlist = false;
+        model->state.ui.prompt_kind = PROMPT_NONE;
+
+        set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+}
+
 void playlist_save(void)
 {
         Model *model = get_model();
@@ -1087,21 +1121,172 @@ void playlist_save(void)
 
         export_current_playlist(model->settings.path, playlist, model->state.ui.playlist_name);
 
-        model->state.ui.naming_playlist = false;
+        model->state.ui.request_library_update = true;
 
-        set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+        close_prompt();
 }
 
 void set_save_playlist_mode(void)
 {
         Model *model = get_model();
 
-        model->state.ui.playlist_name[0] = '\0';
+        set_playlist_name(NULL);
         model->state.ui.naming_playlist = true;
-        num_playlist_name_letters = 0;
-        num_playlist_name_bytes = 0;
+        model->state.ui.prompt_kind = PROMPT_SAVE_PLAYLIST;
+        playlist_pick_index = -1;
 
         set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+}
+
+static const char *entry_path_for_add(void)
+{
+        Model *model = get_model();
+        AppState *state = &model->state;
+
+        switch (state->currentView) {
+        case LIBRARY_VIEW:
+                return state->ui.current_lib_entry ? state->ui.current_lib_entry->full_path : NULL;
+        case SEARCH_VIEW:
+                return state->ui.current_search_entry ? state->ui.current_search_entry->full_path : NULL;
+        case PLAYLIST_VIEW: {
+                Node *node = find_selected_entry(get_unshuffled_playlist(), state->ui.chosen_row);
+                return node ? node->song.file_path : NULL;
+        }
+        default: {
+                Node *current = get_current_song();
+                return current ? current->song.file_path : NULL;
+        }
+        }
+}
+
+void set_add_to_playlist_mode(void)
+{
+        Model *model = get_model();
+        const char *path = entry_path_for_add();
+
+        if (path == NULL) {
+                set_error_message("Select a song or folder first.");
+                return;
+        }
+
+        snprintf(model->state.ui.pending_add_path, sizeof(model->state.ui.pending_add_path), "%s", path);
+
+        int count = collect_library_playlists(get_library(), library_playlists, MAX_LIBRARY_PLAYLISTS);
+
+        if (count > 0) {
+                char stem[KEW_NAME_MAX];
+                playlist_stem(library_playlists[0]->full_path, stem, sizeof(stem));
+                set_playlist_name(stem);
+                playlist_pick_index = 0;
+        } else {
+                set_playlist_name(NULL);
+                playlist_pick_index = -1;
+        }
+
+        model->state.ui.naming_playlist = true;
+        model->state.ui.prompt_kind = PROMPT_ADD_TO_PLAYLIST;
+
+        set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+}
+
+void playlist_prompt_cycle(int direction)
+{
+        int count = collect_library_playlists(get_library(), library_playlists, MAX_LIBRARY_PLAYLISTS);
+
+        if (count == 0)
+                return;
+
+        if (playlist_pick_index < 0)
+                playlist_pick_index = direction > 0 ? 0 : count - 1;
+        else
+                playlist_pick_index = (playlist_pick_index + direction + count) % count;
+
+        char stem[KEW_NAME_MAX];
+        playlist_stem(library_playlists[playlist_pick_index]->full_path, stem, sizeof(stem));
+        set_playlist_name(stem);
+
+        set_dirty(DIRTY_VISUALIZER | DIRTY_FOOTER);
+}
+
+static FileSystemEntry *find_playlist_by_name(const char *name)
+{
+        int count = collect_library_playlists(get_library(), library_playlists, MAX_LIBRARY_PLAYLISTS);
+
+        for (int i = 0; i < count; i++) {
+                char stem[KEW_NAME_MAX];
+                playlist_stem(library_playlists[i]->full_path, stem, sizeof(stem));
+                if (g_ascii_strcasecmp(stem, name) == 0)
+                        return library_playlists[i];
+        }
+
+        return NULL;
+}
+
+static void add_pending_entry_to_playlist(void)
+{
+        Model *model = get_model();
+        const char *name = model->state.ui.playlist_name;
+        FileSystemEntry *entry = find_corresponding_entry(get_library(), model->state.ui.pending_add_path);
+        char target[KEW_PATH_MAX];
+        char message[KEW_PATH_MAX * 2];
+
+        if (entry == NULL) {
+                set_error_message("Song not found in library.");
+                return;
+        }
+
+        FileSystemEntry *existing = find_playlist_by_name(name);
+
+        if (existing != NULL) {
+                snprintf(target, sizeof(target), "%s", existing->full_path);
+        } else {
+                char music_dir[KEW_PATH_MAX];
+                expand_path(model->settings.path, music_dir, sizeof(music_dir));
+                size_t len = strlen(music_dir);
+                int written = snprintf(target, sizeof(target), "%s%s%s.m3u", music_dir,
+                                       (len > 0 && music_dir[len - 1] == '/') ? "" : "/", name);
+                if (written < 0 || written >= (int)sizeof(target)) {
+                        set_error_message("Playlist name is too long.");
+                        return;
+                }
+                model->state.ui.request_library_update = true;
+        }
+
+        int added = playlist_file_add_entry(target, entry);
+
+        if (added < 0)
+                snprintf(message, sizeof(message), "Could not write %s.", target);
+        else if (added == 0)
+                snprintf(message, sizeof(message), "Already in %s.", name);
+        else
+                snprintf(message, sizeof(message), "Added %d song%s to %s.", added, added == 1 ? "" : "s", name);
+
+        set_error_message(message);
+}
+
+void playlist_prompt_confirm(void)
+{
+        Model *model = get_model();
+
+        switch (model->state.ui.prompt_kind) {
+        case PROMPT_SAVE_PLAYLIST:
+                playlist_save();
+                break;
+        case PROMPT_ADD_TO_PLAYLIST:
+                if (num_playlist_name_letters < min_playlist_name_letters)
+                        return;
+                add_pending_entry_to_playlist();
+                close_prompt();
+                break;
+        default:
+                close_prompt();
+                break;
+        }
+}
+
+void playlist_prompt_cancel(void)
+{
+        close_prompt();
 }
 
 char *get_playlist_name(void)

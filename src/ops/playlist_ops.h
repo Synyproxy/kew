@@ -299,6 +299,26 @@ void playlist_save(void);
 
 void set_save_playlist_mode(void);
 
+/**
+ * @brief Opens the "add to playlist" prompt for the selected song or folder.
+ */
+void set_add_to_playlist_mode(void);
+
+/**
+ * @brief Cycles the prompt text through the playlists found in the library.
+ */
+void playlist_prompt_cycle(int direction);
+
+/**
+ * @brief Runs the action of the open prompt (save or add).
+ */
+void playlist_prompt_confirm(void);
+
+/**
+ * @brief Closes the open prompt without doing anything.
+ */
+void playlist_prompt_cancel(void);
+
 char *get_playlist_name(void);
 
 #endif

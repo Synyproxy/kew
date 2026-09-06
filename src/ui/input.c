@@ -99,6 +99,24 @@ struct Msg handle_name_playlist_event(struct tb_event *ev)
 
         if (model->state.ui.naming_playlist) {
 
+                if (ev->key == TB_KEY_ESC) {
+                        playlist_prompt_cancel();
+                        event.type = MSG_NAMING_PLAYLIST;
+                        return event;
+                }
+
+                if (ev->key == TB_KEY_TAB || ev->key == TB_KEY_ARROW_DOWN) {
+                        playlist_prompt_cycle(1);
+                        event.type = MSG_NAMING_PLAYLIST;
+                        return event;
+                }
+
+                if (ev->key == TB_KEY_BACK_TAB || ev->key == TB_KEY_ARROW_UP) {
+                        playlist_prompt_cycle(-1);
+                        event.type = MSG_NAMING_PLAYLIST;
+                        return event;
+                }
+
                 if (ev->key == TB_KEY_SPACE && ev->mod == 0)
                         ev->ch = ' ';
 
@@ -128,7 +146,7 @@ struct Msg handle_name_playlist_event(struct tb_event *ev)
                 }
 #endif
                 if (ev->key == TB_KEY_ENTER) {
-                        playlist_save();
+                        playlist_prompt_confirm();
                         event.type = MSG_NAMING_PLAYLIST;
                 }
         }
