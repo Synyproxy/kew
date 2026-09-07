@@ -920,6 +920,8 @@ void set_default_config(AppSettings *settings)
                  sizeof(settings->visualizer_bar_width));
         c_strcpy(settings->visualizerBrailleMode, "0",
                  sizeof(settings->visualizerBrailleMode));
+        c_strcpy(settings->visualizerWaveform, "1",
+                 sizeof(settings->visualizerWaveform));
         c_strcpy(settings->progressBarElapsedEvenChar, "━",
                  sizeof(settings->progressBarElapsedEvenChar));
         c_strcpy(settings->progressBarElapsedOddChar, "━",
@@ -1457,6 +1459,10 @@ void construct_app_settings(AppSettings *settings, KeyValuePair *pairs, int coun
                 } else if (strcmp(lowercase_key, "visualizerbarwidth") == 0) {
                         snprintf(settings->visualizer_bar_width,
                                  sizeof(settings->visualizer_bar_width), "%s",
+                                 pair->value);
+                } else if (strcmp(lowercase_key, "visualizerwaveform") == 0) {
+                        snprintf(settings->visualizerWaveform,
+                                 sizeof(settings->visualizerWaveform), "%s",
                                  pair->value);
                 } else if (strcmp(lowercase_key, "visualizerbraillemode") == 0) {
                         snprintf(settings->visualizerBrailleMode,
@@ -2249,6 +2255,12 @@ void set_config(AppSettings *settings, UISettings *ui)
                                sizeof(settings->visualizerBrailleMode))
                     : c_strcpy(settings->visualizerBrailleMode, "0",
                                sizeof(settings->visualizerBrailleMode));
+        if (settings->visualizerWaveform[0] == '\0')
+                ui->visualizerWaveform
+                    ? c_strcpy(settings->visualizerWaveform, "1",
+                               sizeof(settings->visualizerWaveform))
+                    : c_strcpy(settings->visualizerWaveform, "0",
+                               sizeof(settings->visualizerWaveform));
         if (settings->hideLogo[0] == '\0')
                 ui->hideLogo ? c_strcpy(settings->hideLogo, "1",
                                         sizeof(settings->hideLogo))
@@ -2398,8 +2410,10 @@ void set_config(AppSettings *settings, UISettings *ui)
         fprintf(file, "# Visualizer mode: 0=lighten, 1=flat, 2=reversed lighten, 3=party, 4=vibrant. 5=lum vibrant 6=binning 7=two color gradient 8=off.\n");
         fprintf(file, "visualizerColorType=%s\n", settings->visualizer_mode);
         fprintf(file, "visualizerHeight=%s\n", settings->visualizer_height);
-        fprintf(file, "visualizerBrailleMode=%s\n\n",
+        fprintf(file, "visualizerBrailleMode=%s\n",
                 settings->visualizerBrailleMode);
+        fprintf(file, "# 1=Show the whole track's loudness as a waveform that fills in as it plays, 0=live spectrum bars.\n");
+        fprintf(file, "visualizerWaveform=%s\n\n", settings->visualizerWaveform);
 
         fprintf(file, "# 0=Thin bars, 1=Bars twice the width, 2=Auto (depends "
                       "on window size).\n");

@@ -51,6 +51,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
 #include "sys/sys_integration.h"
 
 #include "sound/sound_facade.h"
+#include "sound/waveform.h"
 
 #include "ui/chroma.h"
 #include "ui/cli.h"
@@ -264,6 +265,7 @@ void kew_shutdown()
         settings_shutdown();
         library_shutdown();
         ui_shutdown();
+        waveform_shutdown();
         visualizer_shutdown();
         k_log_shutdown();
         notifications_shutdown();
@@ -732,6 +734,7 @@ void state_init(void)
         state->settings.discordRPCEnabled = true;
         state->settings.visualizer_height = 5;
         state->settings.visualizerBrailleMode = false;
+        state->settings.visualizerWaveform = true;
         state->settings.visualizer_bar_mode = 2;
         state->settings.titleDelay = 1;
         state->settings.auto_resume = true;

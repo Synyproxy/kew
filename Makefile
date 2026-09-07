@@ -236,7 +236,7 @@ OBJDIR = src/obj
 SRCS = src/common/appstate.c src/ui/common_ui.c src/common/common.c \
        src/utils/utils.c src/utils/file.c src/utils/img_utils.c src/utils/term.c src/utils/k_log.c \
        src/sound/sound_facade.c src/sound/sound.c src/sound/m4a.c src/sound/audiobuffer.c \
-       src/sound/decoders.c src/sound/audio_file_info.c src/sound/playback.c src/sound/volume.c \
+       src/sound/decoders.c src/sound/waveform.c src/sound/audio_file_info.c src/sound/playback.c src/sound/volume.c \
        src/sys/sys_integration.c src/sys/notifications.c src/sys/mpris.c src/sys/discord_rpc.c \
        src/ops/playback_ops.c src/ops/playback_clock.c src/ops/search_ops.c  src/ops/playback_system.c \
        src/ops/playlist_ops.c src/ops/playlist_edit_ops.c src/ops/library_ops.c src/ops/track_manager.c src/ops/playback_state.c \

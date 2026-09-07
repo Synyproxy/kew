@@ -66,6 +66,7 @@ ComponentMsg component_time_simple_and_vol(const Model *model, k_Rect region, Dr
 ComponentMsg component_volume(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty);
 
 ComponentMsg component_visualizer(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty);
+ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty);
 
 ComponentMsg component_vis_and_progress_bar(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty);
 

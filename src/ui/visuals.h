@@ -39,3 +39,5 @@ void draw_spectrum_visualizer_to_buf(const Model *model, DrawBuffer *buf, sound_
 void generate_all_visualizer_palettes(Model *model, int height);
 
 void visualizer_shutdown(void);
+
+char *get_upward_motion_char(int level, bool braille);

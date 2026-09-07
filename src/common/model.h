@@ -380,6 +380,7 @@ typedef struct
 
         int visualizer_height;      /**< Height (in terminal rows) of the spectrum visualizer. */
         bool visualizerBrailleMode; /**< Render visualizer using braille characters. */
+        bool visualizerWaveform;    /**< Draw the track loudness as a waveform progress view instead of the spectrum. */
 
         int titleDelay;           /**< Delay before drawing title in track view (ms). */
         int cacheLibrary;         /**< Whether to cache the music library. */
@@ -702,6 +703,7 @@ typedef struct
         char hardStop[6];
         char sort_library[6];
         char visualizerBrailleMode[2];
+        char visualizerWaveform[2];
         char progressBarElapsedEvenChar[12];
         char progressBarElapsedOddChar[12];
         char progressBarApproachingEvenChar[12];

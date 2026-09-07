@@ -22,6 +22,7 @@
 #include "common_ui.h"
 #include "settings.h"
 #include "sound/audiotypes.h"
+#include "sound/waveform.h"
 
 #include "ui/playlist_ui.h"
 #include "ui/render_ui.h"
@@ -2121,27 +2122,14 @@ ComponentMsg component_metadata(const Model *model, k_Rect region, DrawBuffer *b
         return (ComponentMsg){0};
 }
 
-ComponentMsg component_progress_bar(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty)
+/* Resolves the three progress colours (upcoming, elapsed, playhead) the way
+   the progress bar does, so the waveform view matches it exactly. */
+static void progress_styles(const Model *model, CellStyle *empty_out,
+                            CellStyle *filled_out, CellStyle *current_out)
 {
-        (void)dirty;
-
         const UISettings *ui = &model->state.settings;
-        const AppSettings *settings = &model->settings;
 
-        // leading space
-        CellStyle plain = cell_style_plain();
-        draw_buffer_set_string(buf, region.row, region.col, " ", plain);
         CellStyle empty = cell_style_from_theme(ui->theme.progress_empty);
-
-        int draw_col = region.col;
-
-        double duration = 0.0;
-
-        if (model->songdata_ok && model->songdata)
-                duration = model->songdata->duration;
-
-        int elapsed_bars = calc_elapsed_bars(model->elapsed_seconds, duration, region.width);
-
         CellStyle filled_style = cell_style_from_theme(ui->theme.progress_filled);
         CellStyle current_style = cell_style_from_theme(ui->theme.progress_elapsed);
 
@@ -2181,6 +2169,122 @@ ComponentMsg component_progress_bar(const Model *model, k_Rect region, DrawBuffe
                         empty.isAnsi = false;
                 }
         }
+
+        *empty_out = empty;
+        *filled_out = filled_style;
+        *current_out = current_style;
+}
+
+static double current_duration(const Model *model)
+{
+        if (model->songdata_ok && model->songdata)
+                return model->songdata->duration;
+        return 0.0;
+}
+
+/* Draws the whole track's loudness envelope, one column per slice of the
+   song, coloured like the progress bar: played columns bright, the playhead
+   highlighted, the rest dimmed. Bar height follows the volume of that slice. */
+ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty)
+{
+        (void)dirty;
+
+        if (region.height <= 0 || region.width <= 0)
+                return (ComponentMsg){0};
+
+        CellStyle blank = cell_style_plain();
+        for (int j = 0; j < region.height; j++)
+                draw_buffer_set_string_truncated(buf, region.row + j, region.col, "",
+                                                 region.width, blank);
+
+        if (!model->songdata_ok || !model->songdata || model->songdata->file_path[0] == '\0')
+                return (ComponentMsg){0};
+
+        waveform_request(model->songdata->file_path);
+
+        double duration = current_duration(model);
+        if (duration <= 0.0)
+                return (ComponentMsg){0};
+
+        WaveformView view;
+        if (!waveform_acquire(model->songdata->file_path, &view))
+                return (ComponentMsg){0};
+
+        CellStyle empty, filled, current;
+        progress_styles(model, &empty, &filled, &current);
+
+        /* Same columns as the progress bar below, so the playhead lines up. */
+        int bar_col = region.col;
+        int bars = region.width;
+        int elapsed_bars = calc_elapsed_bars(model->elapsed_seconds, duration, bars);
+        int levels = region.height * 8;
+
+        for (int i = 0; i < bars; i++) {
+                double t0 = duration * i / bars;
+                double t1 = duration * (i + 1) / bars;
+                size_t w0 = (size_t)(t0 / WAVEFORM_WINDOW_SECONDS);
+                size_t w1 = (size_t)(t1 / WAVEFORM_WINDOW_SECONDS);
+                if (w1 <= w0)
+                        w1 = w0 + 1;
+
+                float sum = 0.0f;
+                int known = 0;
+                for (size_t w = w0; w < w1 && w < view.count; w++) {
+                        sum += view.values[w];
+                        known++;
+                }
+
+                int filled_eighths = 0;
+                if (known) {
+                        float level = waveform_level(&view, sum / (float)known);
+                        filled_eighths = (int)(level * levels + 0.5f);
+                        if (filled_eighths < 1)
+                                filled_eighths = 1;
+                        if (filled_eighths > levels)
+                                filled_eighths = levels;
+                }
+
+                CellStyle style = (i < elapsed_bars) ? filled
+                                : (i == elapsed_bars) ? current
+                                                      : empty;
+
+                for (int j = 0; j < region.height; j++) {
+                        int draw_row = region.row + region.height - 1 - j;
+                        int remaining = filled_eighths - j * 8;
+                        const char *ch;
+                        if (remaining >= 8)
+                                ch = get_upward_motion_char(8, false);
+                        else if (remaining > 0)
+                                ch = get_upward_motion_char(remaining, false);
+                        else
+                                continue;
+                        draw_buffer_set_string(buf, draw_row, bar_col + i, ch, style);
+                }
+        }
+
+        waveform_release();
+
+        return (ComponentMsg){0};
+}
+
+ComponentMsg component_progress_bar(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty)
+{
+        (void)dirty;
+
+        const AppSettings *settings = &model->settings;
+
+        // leading space
+        CellStyle plain = cell_style_plain();
+        draw_buffer_set_string(buf, region.row, region.col, " ", plain);
+
+        int draw_col = region.col;
+
+        double duration = current_duration(model);
+
+        int elapsed_bars = calc_elapsed_bars(model->elapsed_seconds, duration, region.width);
+
+        CellStyle empty, filled_style, current_style;
+        progress_styles(model, &empty, &filled_style, &current_style);
 
         CellStyle style = empty;
 
@@ -2422,6 +2526,9 @@ ComponentMsg component_visualizer(const Model *model, k_Rect region, DrawBuffer 
         // clamp height to region
         if (height > region.height)
                 height = region.height;
+
+        if (ui->visualizerWaveform && height >= 1)
+                return component_waveform(model, region, buf, dirty);
 
         if (height < 2 || model->is_paused)
                 return (ComponentMsg){0};
