@@ -29,7 +29,9 @@ typedef struct {
         size_t count;
         size_t capacity;
         float peak;
-        float floor_db;  /* quiet end of the track, dB below peak */
+        float low_db;    /* 5th percentile, dB below peak */
+        float mid_db;    /* median */
+        float high_db;   /* 95th percentile */
         bool complete;
 } Envelope;
 
@@ -141,11 +143,18 @@ static void cache_store(const char *file_path, const float *raw, size_t count)
 
 /* ---------- envelope building ---------- */
 
+static void env_reset_stats(void)
+{
+        env.low_db = -30.0f;
+        env.mid_db = -6.0f;
+        env.high_db = -1.0f;
+}
+
 static void env_free_locked(void)
 {
         free(env.raw);
         memset(&env, 0, sizeof(env));
-        env.floor_db = -30.0f;
+        env_reset_stats();
 }
 
 static int cmp_float(const void *a, const void *b)
@@ -154,12 +163,19 @@ static int cmp_float(const void *a, const void *b)
         return (x > y) - (x < y);
 }
 
-/* Picks the dB floor for the display: the 5th percentile of the windows so
-   quiet intros and breakdowns sit low while the body of the track keeps its
-   shape. Clamped so very flat or very dynamic material still reads. */
-static void env_update_floor_locked(void)
+static float to_db(float rms, float peak)
 {
-        env.floor_db = -30.0f;
+        if (rms <= 0.0f || peak <= 0.0f)
+                return -60.0f;
+        float db = 20.0f * log10f(rms / peak);
+        return db < -60.0f ? -60.0f : db;
+}
+
+/* Samples the loudness distribution so the display can stretch each track
+   between its quiet, typical and loud passages. */
+static void env_update_stats_locked(void)
+{
+        env_reset_stats();
         if (env.count < 8 || env.peak <= 0.0f)
                 return;
 
@@ -169,18 +185,22 @@ static void env_update_floor_locked(void)
         memcpy(sorted, env.raw, sizeof(float) * env.count);
         qsort(sorted, env.count, sizeof(float), cmp_float);
 
-        float p05 = sorted[env.count / 20];
+        float low = to_db(sorted[env.count / 20], env.peak);
+        float mid = to_db(sorted[env.count / 2], env.peak);
+        float high = to_db(sorted[env.count * 19 / 20], env.peak);
         free(sorted);
 
-        if (p05 <= 0.0f)
-                return;
+        /* Keep the three points apart so a flat track still gets a scale. */
+        if (high > mid - 0.5f)
+                high = mid - 0.5f + 1.0f;
+        if (mid > high - 0.5f)
+                mid = high - 0.5f;
+        if (low > mid - 1.0f)
+                low = mid - 1.0f;
 
-        float db = 20.0f * log10f(p05 / env.peak);
-        if (db > -12.0f)
-                db = -12.0f;
-        if (db < -40.0f)
-                db = -40.0f;
-        env.floor_db = db;
+        env.low_db = low;
+        env.mid_db = mid;
+        env.high_db = high;
 }
 
 static bool env_push_locked(float rms)
@@ -231,7 +251,7 @@ static void *worker_main(void *arg)
                 if (strcmp(env.path, path) == 0) {
                         for (size_t i = 0; i < cached_count; i++)
                                 env_push_locked(cached[i]);
-                        env_update_floor_locked();
+                        env_update_stats_locked();
                         env.complete = true;
                 }
                 pthread_mutex_unlock(&lock);
@@ -320,7 +340,7 @@ static void *worker_main(void *arg)
                                         aborted = true;
                                 /* Refresh the display floor now and then while decoding. */
                                 if (same && ++windows_since_publish >= 200) {
-                                        env_update_floor_locked();
+                                        env_update_stats_locked();
                                         windows_since_publish = 0;
                                 }
                                 pthread_mutex_unlock(&lock);
@@ -349,7 +369,7 @@ static void *worker_main(void *arg)
 
         pthread_mutex_lock(&lock);
         if (!aborted && strcmp(env.path, path) == 0) {
-                env_update_floor_locked();
+                env_update_stats_locked();
                 env.complete = true;
                 to_cache = malloc(sizeof(float) * env.count);
                 if (to_cache) {
@@ -428,7 +448,9 @@ bool waveform_acquire(const char *file_path, WaveformView *view)
         view->count = env.count;
         view->complete = env.complete;
         view->peak = env.peak;
-        view->floor_db = env.floor_db;
+        view->low_db = env.low_db;
+        view->mid_db = env.mid_db;
+        view->high_db = env.high_db;
         return true;
 }
 
@@ -437,15 +459,25 @@ float waveform_level(const WaveformView *view, float rms)
         if (!view || view->peak <= 0.0f || rms <= 0.0f)
                 return 0.0f;
 
-        float db = 20.0f * log10f(rms / view->peak);
-        float floor_db = view->floor_db < -1.0f ? view->floor_db : -30.0f;
-        float t = 1.0f - db / floor_db; /* floor -> 0, peak -> 1 */
-        if (t < 0.0f)
-                t = 0.0f;
+        /* Piecewise map: quiet passages sit low, the median lands mid-height
+           and the loud 5% climb to the top, whatever the track's dynamics. */
+        const float low_h = 0.12f, mid_h = 0.5f, high_h = 0.92f;
+        float db = to_db(rms, view->peak);
+        float t;
+
+        if (db <= view->mid_db) {
+                float span = view->mid_db - view->low_db;
+                t = low_h + (mid_h - low_h) * (db - view->low_db) / (span > 0.01f ? span : 0.01f);
+        } else {
+                float span = view->high_db - view->mid_db;
+                t = mid_h + (high_h - mid_h) * (db - view->mid_db) / (span > 0.01f ? span : 0.01f);
+        }
+
+        if (t < 0.05f)
+                t = 0.05f;
         if (t > 1.0f)
                 t = 1.0f;
-        /* Keep a little bar even at the floor, like SoundCloud's baseline. */
-        return 0.08f + 0.92f * t;
+        return t;
 }
 
 void waveform_release(void)

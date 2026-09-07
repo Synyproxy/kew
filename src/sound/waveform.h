@@ -24,17 +24,23 @@
  * `complete` is false the values are only known for the first
  * `count * WAVEFORM_WINDOW_SECONDS` seconds of the track.
  *
- * `peak` is the loudest window seen so far and `floor_db` how far below it
- * (in decibels, negative) the quiet end of the track sits. Use
- * `waveform_level` to turn an RMS value into a bar height in [0,1].
+ * `peak` is the loudest window seen so far. `low_db`, `mid_db` and
+ * `high_db` are the 5th, 50th and 95th percentile loudness in decibels
+ * below that peak. `waveform_level` stretches a value between them so
+ * the body of any track, however compressed, spreads across the height.
  */
 typedef struct {
         const float *values;
         size_t count;
         bool complete;
         float peak;
-        float floor_db;
+        float low_db;
+        float mid_db;
+        float high_db;
 } WaveformView;
+
+/** Rows the waveform uses at most, however tall the visualizer area is. */
+#define WAVEFORM_MAX_ROWS 3
 
 /** @brief Maps a linear RMS value to a display height in [0,1] on a dB scale. */
 float waveform_level(const WaveformView *view, float rms);

@@ -2217,7 +2217,8 @@ ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *b
         int bar_col = region.col;
         int bars = region.width;
         int elapsed_bars = calc_elapsed_bars(model->elapsed_seconds, duration, bars);
-        int levels = region.height * 8;
+        int rows = region.height < WAVEFORM_MAX_ROWS ? region.height : WAVEFORM_MAX_ROWS;
+        int levels = rows * 8;
 
         for (int i = 0; i < bars; i++) {
                 double t0 = duration * i / bars;
@@ -2248,7 +2249,7 @@ ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *b
                                 : (i == elapsed_bars) ? current
                                                       : empty;
 
-                for (int j = 0; j < region.height; j++) {
+                for (int j = 0; j < rows; j++) {
                         int draw_row = region.row + region.height - 1 - j;
                         int remaining = filled_eighths - j * 8;
                         const char *ch;
