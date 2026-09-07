@@ -2182,9 +2182,43 @@ static double current_duration(const Model *model)
         return 0.0;
 }
 
-/* Draws the whole track's loudness envelope, one column per slice of the
-   song, coloured like the progress bar: played columns bright, the playhead
-   highlighted, the rest dimmed. Bar height follows the volume of that slice. */
+/* Average loudness of the slice of the track between t0 and t1, or -1 when
+   nothing in that range has been decoded yet. */
+static float waveform_slice_level(const WaveformView *view, double t0, double t1)
+{
+        size_t w0 = (size_t)(t0 / WAVEFORM_WINDOW_SECONDS);
+        size_t w1 = (size_t)(t1 / WAVEFORM_WINDOW_SECONDS);
+        if (w1 <= w0)
+                w1 = w0 + 1;
+
+        float sum = 0.0f;
+        int known = 0;
+        for (size_t w = w0; w < w1 && w < view->count; w++) {
+                sum += view->values[w];
+                known++;
+        }
+        if (!known)
+                return -1.0f;
+        return waveform_level(view, sum / (float)known);
+}
+
+/* Braille dot bits for the bottom `n` dots (0..4) of the left and right
+   column of a cell: dots 7,3,2,1 on the left and 8,6,5,4 on the right. */
+static unsigned char braille_column_bits(int n, bool right)
+{
+        static const unsigned char left[5] = {0x00, 0x40, 0x44, 0x46, 0x47};
+        static const unsigned char right_bits[5] = {0x00, 0x80, 0xA0, 0xB0, 0xB8};
+        if (n < 0)
+                n = 0;
+        if (n > 4)
+                n = 4;
+        return right ? right_bits[n] : left[n];
+}
+
+/* Draws the whole track's loudness envelope as braille bars, two per column
+   so even long sets keep their detail, coloured like the progress bar:
+   played bars bright, the playhead highlighted, the rest dimmed. Bar height
+   follows the volume of that slice, four steps per row. */
 ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *buf, DirtyFlags dirty)
 {
         (void)dirty;
@@ -2213,53 +2247,43 @@ ComponentMsg component_waveform(const Model *model, k_Rect region, DrawBuffer *b
         CellStyle empty, filled, current;
         progress_styles(model, &empty, &filled, &current);
 
-        /* Same columns as the progress bar below, so the playhead lines up. */
+        /* Same columns as the progress bar below, so the playhead lines up,
+           but two braille bars per column. */
         int bar_col = region.col;
-        int bars = region.width;
+        int bars = region.width * 2;
         int elapsed_bars = calc_elapsed_bars(model->elapsed_seconds, duration, bars);
         int rows = region.height < WAVEFORM_MAX_ROWS ? region.height : WAVEFORM_MAX_ROWS;
-        int levels = rows * 8;
+        int levels = rows * 4;
 
-        for (int i = 0; i < bars; i++) {
-                double t0 = duration * i / bars;
-                double t1 = duration * (i + 1) / bars;
-                size_t w0 = (size_t)(t0 / WAVEFORM_WINDOW_SECONDS);
-                size_t w1 = (size_t)(t1 / WAVEFORM_WINDOW_SECONDS);
-                if (w1 <= w0)
-                        w1 = w0 + 1;
-
-                float sum = 0.0f;
-                int known = 0;
-                for (size_t w = w0; w < w1 && w < view.count; w++) {
-                        sum += view.values[w];
-                        known++;
+        for (int x = 0; x < region.width; x++) {
+                int heights[2] = {0, 0};
+                for (int half = 0; half < 2; half++) {
+                        int i = x * 2 + half;
+                        float level = waveform_slice_level(&view, duration * i / bars,
+                                                           duration * (i + 1) / bars);
+                        if (level < 0.0f)
+                                continue;
+                        int h = (int)(level * levels + 0.5f);
+                        heights[half] = h < 1 ? 1 : h > levels ? levels : h;
                 }
 
-                int filled_eighths = 0;
-                if (known) {
-                        float level = waveform_level(&view, sum / (float)known);
-                        filled_eighths = (int)(level * levels + 0.5f);
-                        if (filled_eighths < 1)
-                                filled_eighths = 1;
-                        if (filled_eighths > levels)
-                                filled_eighths = levels;
-                }
-
-                CellStyle style = (i < elapsed_bars) ? filled
-                                : (i == elapsed_bars) ? current
-                                                      : empty;
+                int left = x * 2, right = left + 1;
+                CellStyle style = (right < elapsed_bars) ? filled
+                                : (left > elapsed_bars) ? empty
+                                                        : current;
 
                 for (int j = 0; j < rows; j++) {
-                        int draw_row = region.row + region.height - 1 - j;
-                        int remaining = filled_eighths - j * 8;
-                        const char *ch;
-                        if (remaining >= 8)
-                                ch = get_upward_motion_char(8, false);
-                        else if (remaining > 0)
-                                ch = get_upward_motion_char(remaining, false);
-                        else
+                        unsigned char bits =
+                            braille_column_bits(heights[0] - j * 4, false) |
+                            braille_column_bits(heights[1] - j * 4, true);
+                        if (!bits)
                                 continue;
-                        draw_buffer_set_string(buf, draw_row, bar_col + i, ch, style);
+                        unsigned cp = 0x2800 | bits;
+                        char ch[4] = {(char)(0xE0 | (cp >> 12)),
+                                      (char)(0x80 | ((cp >> 6) & 0x3F)),
+                                      (char)(0x80 | (cp & 0x3F)), '\0'};
+                        int draw_row = region.row + region.height - 1 - j;
+                        draw_buffer_set_string(buf, draw_row, bar_col + x, ch, style);
                 }
         }
 
