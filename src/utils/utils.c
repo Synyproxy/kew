@@ -10,6 +10,7 @@
 #include "k_log.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <glib.h>
 #include <math.h>
@@ -662,4 +663,37 @@ int get_last_char_bytes(const char *str, int len)
                 i--;
         }
         return len - i;
+}
+
+void run_detached(const char *cmd)
+{
+#ifndef _WIN32
+    if (cmd == NULL || cmd[0] == '\0')
+        return;
+
+    // Double fork so the command is reparented to init and never leaves a
+    // zombie behind; the middle child exits at once.
+    pid_t pid = fork();
+    if (pid < 0)
+        return;
+    if (pid == 0) {
+        if (fork() == 0) {
+            setsid();
+            int devnull = open("/dev/null", O_RDWR);
+            if (devnull >= 0) {
+                dup2(devnull, STDIN_FILENO);
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                if (devnull > STDERR_FILENO)
+                    close(devnull);
+            }
+            execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        }
+        _exit(0);
+    }
+    while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
+        ;
+#else
+    (void)cmd;
+#endif
 }

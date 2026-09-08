@@ -61,6 +61,9 @@ int get_number(const char *str);
  */
 int copy_file(const char *src, const char *dst);
 
+// Run a shell command in its own session, without waiting or reaping.
+void run_detached(const char *cmd);
+
 /**
  * @brief Extracts the numeric value from a string.
  *

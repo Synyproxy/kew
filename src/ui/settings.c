@@ -738,6 +738,7 @@ static const EventMap event_map[] = {
     {"nextSong", MSG_NEXT},
     {"prevSong", MSG_PREV},
     {"quit", MSG_QUIT},
+    {"hide", MSG_HIDE},
     {"toggleRepeat", MSG_TOGGLEREPEAT},
     {"toggleVisualizer", MSG_CYCLEVISUALIZERMODE},
     {"cycleVisualizerMode", MSG_CYCLEVISUALIZERMODE},
@@ -907,6 +908,7 @@ void set_default_config(AppSettings *settings)
         c_strcpy(settings->coverStyle, "auto", sizeof(settings->coverStyle));
         c_strcpy(settings->quitAfterStopping, "0",
                  sizeof(settings->quitAfterStopping));
+        settings->hideCommand[0] = '\0';
         c_strcpy(settings->clearListClearsAll, "1",
                  sizeof(settings->clearListClearsAll));
         c_strcpy(settings->hideGlimmeringText, "0",
@@ -1521,6 +1523,10 @@ void construct_app_settings(AppSettings *settings, KeyValuePair *pairs, int coun
                 } else if (strcmp(lowercase_key, "quitonstop") == 0) {
                         snprintf(settings->quitAfterStopping,
                                  sizeof(settings->quitAfterStopping), "%s",
+                                 pair->value);
+                } else if (strcmp(lowercase_key, "hidecommand") == 0) {
+                        snprintf(settings->hideCommand,
+                                 sizeof(settings->hideCommand), "%s",
                                  pair->value);
                 } else if (strcmp(lowercase_key, "clearlistclearsall") == 0) {
                         snprintf(settings->clearListClearsAll,
@@ -2339,6 +2345,11 @@ void set_config(AppSettings *settings, UISettings *ui)
         fprintf(file, "# Same as '--quitonstop' flag, exits after playing the "
                       "whole playlist.\n");
         fprintf(file, "quitOnStop=%s\n\n", settings->quitAfterStopping);
+
+        fprintf(file, "# Shell command run by the 'hide' key action (bind = q, hide).\n");
+        fprintf(file, "# Meant for a window manager script that hides the terminal\n");
+        fprintf(file, "# instead of quitting kew. Empty disables the action.\n");
+        fprintf(file, "hideCommand=%s\n\n", settings->hideCommand);
 
         fprintf(file, "# Whether clearing the playlist also removes the "
                       "currently playing song.\n");

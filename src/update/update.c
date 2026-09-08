@@ -603,6 +603,11 @@ UpdateResult update(Model *model, struct Msg *msg)
                 result.cmd.type = CMD_QUIT;
                 break;
 
+        case MSG_HIDE:
+                if (settings->hideCommand[0] != '\0')
+                        run_detached(settings->hideCommand);
+                break;
+
         case MSG_SCROLLDOWN:
                 scroll_next(model);
                 component_library_helper_update_view_state(model);

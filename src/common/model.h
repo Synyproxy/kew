@@ -691,6 +691,7 @@ typedef struct
         char hideTimeStatus[2];
         char simpleTimeStatus[2];
         char quitAfterStopping[2];
+        char hideCommand[512]; /**< Shell command the "hide" action runs, detached. */
         char clearListClearsAll[2];
         char hideGlimmeringText[2];
         char useArtistLink[2];
