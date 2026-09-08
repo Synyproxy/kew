@@ -7,7 +7,7 @@ There must be exactly one kew on this machine, and it is
 
 - `kew` on PATH resolves to `~/.local/bin/kew`.
 - Super+F5 runs `~/.config/hypr/hyprland/scripts/music.sh`, which launches
-  `~/.local/bin/kew` explicitly inside Ghostty (class `kew`) as a pinned
+  `~/.local/bin/kew` explicitly inside Ghostty (class `syny.kew`, Ghostty needs a dotted id) as a pinned
   floating window; when hidden it is parked on the `special:music` workspace.
   Ghostty, not kitty, because it runs a custom GLSL post-process: the same
   CRT shader the Noctalia `syny/syny` panel (Super+F1) uses.
