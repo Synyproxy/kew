@@ -207,6 +207,57 @@ bool playlist_file_remove_path(const char *m3u_path, const char *song_path)
         return ok;
 }
 
+bool playlist_file_swap_paths(const char *m3u_path, const char *path_a, const char *path_b)
+{
+        if (m3u_path == NULL || path_a == NULL || path_b == NULL)
+                return false;
+
+        char expanded[KEW_PATH_MAX];
+        expand_path(m3u_path, expanded, sizeof(expanded));
+
+        gchar *contents = NULL;
+        if (!g_file_get_contents(expanded, &contents, NULL, NULL))
+                return false;
+
+        gchar **lines = g_strsplit(contents, "\n", -1);
+        g_free(contents);
+
+        gchar *directory = g_path_get_dirname(expanded);
+        gint index_a = -1;
+        gint index_b = -1;
+
+        for (gint i = 0; lines[i] != NULL; i++) {
+                gchar *stripped = g_strstrip(g_strdup(g_strdelimit(lines[i], "\r", '\0')));
+
+                if (index_a < 0 && line_matches_path(stripped, directory, path_a))
+                        index_a = i;
+                else if (index_b < 0 && line_matches_path(stripped, directory, path_b))
+                        index_b = i;
+
+                g_free(stripped);
+        }
+
+        bool ok = false;
+
+        if (index_a >= 0 && index_b >= 0) {
+                gchar *tmp = lines[index_a];
+                lines[index_a] = lines[index_b];
+                lines[index_b] = tmp;
+
+                gchar *joined = g_strjoinv("\n", lines);
+                ok = g_file_set_contents(expanded, joined, -1, NULL);
+                g_free(joined);
+
+                if (!ok)
+                        k_log("playlist_file_swap_paths: could not write %s\n", expanded);
+        }
+
+        g_strfreev(lines);
+        g_free(directory);
+
+        return ok;
+}
+
 bool playlist_file_delete(const char *m3u_path)
 {
         if (m3u_path == NULL)

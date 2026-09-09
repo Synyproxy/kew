@@ -327,6 +327,14 @@ void playlist_prompt_cancel(void);
 bool request_playlist_delete(void);
 
 /**
+ * @brief Moves the library-view track under the cursor within its playlist file.
+ *
+ * @param direction -1 moves the track up, 1 moves it down.
+ * @return true if the cursor was on a track under a playlist (the move was handled).
+ */
+bool request_playlist_track_move(int direction);
+
+/**
  * @brief Deletes the playlist file the user confirmed and requests a library update.
  */
 void delete_pending_playlist(void);

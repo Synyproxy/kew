@@ -3320,6 +3320,9 @@ ComponentMsg component_help(const Model *model, k_Rect region, DrawBuffer *buf,
                   get_binding_string(MSG_REMOVE, true));
         HELP_LINE(_(" · Remove Track From Playlist (library, track under a playlist): %s"),
                   get_binding_string(MSG_REMOVE, true));
+        HELP_LINE(_(" · Reorder Track In Playlist (library, track under a playlist): %s/%s"),
+                  get_binding_string(MSG_MOVESONGUP, true),
+                  get_binding_string(MSG_MOVESONGDOWN, true));
 
 #undef HELP_LINE
 

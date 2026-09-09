@@ -776,10 +776,14 @@ UpdateResult update(Model *model, struct Msg *msg)
                 break;
 
         case MSG_MOVESONGUP:
+                if (request_playlist_track_move(-1))
+                        break;
                 result.cmd.type = CMD_MOVE_SONG_UP;
                 break;
 
         case MSG_MOVESONGDOWN:
+                if (request_playlist_track_move(1))
+                        break;
                 result.cmd.type = CMD_MOVE_SONG_DOWN;
                 break;
 

@@ -51,6 +51,15 @@ int playlist_file_add_entry(const char *m3u_path, FileSystemEntry *entry);
 bool playlist_file_remove_path(const char *m3u_path, const char *song_path);
 
 /**
+ * @brief Swaps the lines matching @p path_a and @p path_b in the M3U file.
+ *
+ * Lines between them (comments, missing tracks) keep their place.
+ *
+ * @return true if both lines were found and the file was rewritten.
+ */
+bool playlist_file_swap_paths(const char *m3u_path, const char *path_a, const char *path_b);
+
+/**
  * @brief Deletes the M3U file from disk.
  *
  * @return true on success.

@@ -1331,6 +1331,49 @@ static bool remove_track_from_playlist(FileSystemEntry *track)
         return true;
 }
 
+bool request_playlist_track_move(int direction)
+{
+        Model *model = get_model();
+        FileSystemEntry *track = model->state.ui.current_lib_entry;
+
+        if (model->state.currentView != LIBRARY_VIEW || track == NULL)
+                return false;
+
+        FileSystemEntry *playlist_entry = track->parent;
+
+        if (playlist_entry == NULL || !is_m3u_file(playlist_entry))
+                return false;
+
+        FileSystemEntry *other = NULL;
+
+        if (direction < 0) {
+                for (FileSystemEntry *e = playlist_entry->children; e != NULL && e != track; e = e->next)
+                        other = e;
+        } else {
+                other = track->next;
+        }
+
+        if (other == NULL)
+                return true;
+
+        if (!playlist_file_swap_paths(playlist_entry->full_path, track->full_path, other->full_path)) {
+                char stem[KEW_NAME_MAX];
+                char message[KEW_NAME_MAX + 64];
+                playlist_stem(playlist_entry->full_path, stem, sizeof(stem));
+                snprintf(message, sizeof(message), "Could not reorder %s.", stem);
+                set_error_message(message);
+                return true;
+        }
+
+        model->state.ui.current_lib_entry = NULL;
+        refresh_m3u_children(playlist_entry);
+        model->state.ui.chosen_lib_row += direction < 0 ? -1 : 1;
+
+        set_dirty(DIRTY_LIBRARY);
+
+        return true;
+}
+
 bool request_playlist_delete(void)
 {
         Model *model = get_model();
