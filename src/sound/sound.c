@@ -785,7 +785,12 @@ void *decode_loop(void *arg)
                                 drain_audio_and_pause(sound);
                                 continue;
                         } else {
+                                // The pause is applied right here, so the request is
+                                // served. Leaving it set keeps pb_is_paused() true for
+                                // good, which parks this thread in the loop below and
+                                // stops the pending decoder switch from ever running.
                                 pause_playback();
+                                atomic_store(&sound->request_pause, false);
                         }
                 }
 
