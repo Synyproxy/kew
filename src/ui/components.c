@@ -1,3 +1,5 @@
+#include "sound/video_player.h"
+#include "utils/video_ext.h"
 #include <stdlib.h>
 #include <string.h>
 #define _XOPEN_SOURCE 700
@@ -572,8 +574,9 @@ static FileSystemEntry *component_library_helper_render_node(const Model *model,
                         bool strip_suffix = true;
                         int text_col = draw_col + extra_indent + 3;
 
-                        // playlist icon
-                        if (is_m3u_file(entry)) {
+                        // playlist icon, and videos keep their extension so
+                        // they can be told from songs
+                        if (is_m3u_file(entry) || is_video_path(entry->name)) {
                                 strip_unneeded_chars = false;
                                 strip_suffix = false;
                         }
@@ -1162,6 +1165,21 @@ ComponentMsg component_cover(const Model *model, k_Rect region, DrawBuffer *buf,
         if (!state->settings.coverEnabled || !songdata)
                 return (ComponentMsg){0};
 
+        if (is_video_path(songdata->file_path)) {
+                VideoRect r = {
+                    .row = region.row,
+                    .col = region.col,
+                    .rows = region.height,
+                    .cols = region.width,
+                    .term_rows = model->term_h,
+                    .term_cols = model->term_w,
+                    .term_px_w = model->term_size.width_pixels,
+                    .term_px_h = model->term_size.height_pixels,
+                };
+                video_player_set_rect(&r);
+                return (ComponentMsg){0};
+        }
+
         if (state->settings.coverAnsi && songdata->cover) {
                 draw_cover_ascii(&model->term_size, songdata->cover_art_path,
                                  row, region.col,
@@ -1200,6 +1218,21 @@ ComponentMsg component_cover_centered(const Model *model, k_Rect region, DrawBuf
         if (!state->settings.coverEnabled || !songdata)
                 return (ComponentMsg){0};
 
+        if (is_video_path(songdata->file_path)) {
+                VideoRect r = {
+                    .row = region.row,
+                    .col = region.col,
+                    .rows = region.height,
+                    .cols = region.width,
+                    .term_rows = model->term_h,
+                    .term_cols = model->term_w,
+                    .term_px_w = model->term_size.width_pixels,
+                    .term_px_h = model->term_size.height_pixels,
+                };
+                video_player_set_rect(&r);
+                return (ComponentMsg){0};
+        }
+
         if (state->settings.coverAnsi && songdata->cover) {
                 draw_cover_ascii(&model->term_size, songdata->cover_art_path,
                                  region.row, region.col,
@@ -1237,6 +1270,21 @@ ComponentMsg component_landscape_cover(const Model *model, k_Rect region, DrawBu
 
         if (!ui->coverEnabled || !songdata)
                 return (ComponentMsg){0};
+
+        if (is_video_path(songdata->file_path)) {
+                VideoRect r = {
+                    .row = region.row,
+                    .col = region.col,
+                    .rows = region.height,
+                    .cols = region.width,
+                    .term_rows = model->term_h,
+                    .term_cols = model->term_w,
+                    .term_px_w = term_size->width_pixels,
+                    .term_px_h = term_size->height_pixels,
+                };
+                video_player_set_rect(&r);
+                return (ComponentMsg){0};
+        }
 
         int cover_indent = 1;
 
