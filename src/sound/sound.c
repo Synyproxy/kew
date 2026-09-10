@@ -26,6 +26,8 @@
 #include "audiobuffer.h"
 #include "audiotypes.h"
 #include "decoders.h"
+#include "video_decoder.h"
+#include "video_player.h"
 #include "volume.h"
 
 #include "loader/song_loader.h"
@@ -1163,6 +1165,9 @@ sound_result_t handle_codec(
 
                 cleanup_playback_device();
 
+                if (ops.decoder_type != VIDEO)
+                        video_player_shutdown();
+
                 reset_decoders();
                 reset_audio_buffer();
 
@@ -1255,6 +1260,14 @@ static int init_audio_data_from_codec_decoder(const CodecOps *ops, void *decoder
                 break;
         }
 #endif
+
+        case VIDEO: {
+                ma_video *d = (ma_video *)decoder;
+                ma_video_get_data_format(d, &sound->format, &sound->channels,
+                                         &sound->sample_rate, channel_map, MA_MAX_CHANNELS);
+                ((ma_data_source_base *)d)->pCurrent = d;
+                break;
+        }
 
         default:
                 return -1;
@@ -1384,6 +1397,7 @@ sound_result_t sound_switch_decoder_type(char *file_path)
         if (sound_system_is_end_of_list_reached(sound_s)) {
                 pb_set_EOF_handled();
                 set_current_decoder_type(NONE);
+                video_player_shutdown();
                 return 0;
         }
 

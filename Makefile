@@ -236,7 +236,7 @@ OBJDIR = src/obj
 SRCS = src/common/appstate.c src/ui/common_ui.c src/common/common.c \
        src/utils/utils.c src/utils/file.c src/utils/img_utils.c src/utils/term.c src/utils/k_log.c src/utils/video_ext.c \
        src/sound/sound_facade.c src/sound/sound.c src/sound/m4a.c src/sound/audiobuffer.c \
-       src/sound/decoders.c src/sound/waveform.c src/sound/audio_file_info.c src/sound/playback.c src/sound/volume.c src/sound/video_ipc.c src/sound/video_player.c \
+       src/sound/decoders.c src/sound/waveform.c src/sound/audio_file_info.c src/sound/playback.c src/sound/volume.c src/sound/video_ipc.c src/sound/video_player.c src/sound/video_decoder.c \
        src/sys/sys_integration.c src/sys/notifications.c src/sys/mpris.c src/sys/discord_rpc.c \
        src/ops/playback_ops.c src/ops/playback_clock.c src/ops/search_ops.c  src/ops/playback_system.c \
        src/ops/playlist_ops.c src/ops/playlist_edit_ops.c src/ops/library_ops.c src/ops/track_manager.c src/ops/playback_state.c \
@@ -469,7 +469,10 @@ $(TEST_BIN_DIR)/test_video_ipc: tests/test_video_ipc.c src/sound/video_ipc.c tes
 $(TEST_BIN_DIR)/test_video_player_env: tests/test_video_player_env.c src/sound/video_player.c src/sound/video_ipc.c tests/kew_test.h | $(TEST_BIN_DIR)
 	$(CC) $(TEST_CFLAGS) -DKEW_VIDEO_PLAYER_TEST -o $@ tests/test_video_player_env.c src/sound/video_player.c src/sound/video_ipc.c
 
-TEST_BINS = $(TEST_BIN_DIR)/test_video_ext $(TEST_BIN_DIR)/test_video_ipc $(TEST_BIN_DIR)/test_video_player_env
+$(TEST_BIN_DIR)/test_video_decoder: tests/test_video_decoder.c src/sound/video_decoder.c tests/kew_test.h | $(TEST_BIN_DIR)
+	$(CC) $(TEST_CFLAGS) -DKEW_VIDEO_DECODER_TEST -o $@ tests/test_video_decoder.c src/sound/video_decoder.c -lm -lpthread -ldl
+
+TEST_BINS = $(TEST_BIN_DIR)/test_video_ext $(TEST_BIN_DIR)/test_video_ipc $(TEST_BIN_DIR)/test_video_player_env $(TEST_BIN_DIR)/test_video_decoder
 
 .PHONY: test
 test: $(TEST_BINS)

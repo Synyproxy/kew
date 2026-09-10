@@ -3,6 +3,7 @@
  * @brief Get and set volume.
  *
  */
+#include "video_player.h"
 #include "volume.h"
 
 #include "playback.h"
@@ -27,4 +28,6 @@ void set_current_volume(float volume)
         sound_volume = volume;
 
         ma_device_set_master_volume(get_device(), volume);
+
+        video_player_set_volume((int)(volume * 100.0f + 0.5f));
 }

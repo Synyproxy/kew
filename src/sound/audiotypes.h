@@ -99,6 +99,7 @@ enum decoder_type_t {
         OPUS,
         M4A,
         WEBM,
+        VIDEO,
         NONE
 };
 

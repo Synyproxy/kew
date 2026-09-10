@@ -43,6 +43,15 @@ bool video_ipc_send(VideoIpc *ipc, const char *json_line);
  */
 bool video_ipc_poll(VideoIpc *ipc, VideoIpcStatus *st);
 
+/**
+ * @brief Drains the socket until the peer closes it or timeout_ms passes.
+ * @return true when the peer closed the connection.
+ *
+ * Send this after "quit": mpv drops unread input if the client hangs up
+ * while mpv is still writing an event to it.
+ */
+bool video_ipc_wait_closed(VideoIpc *ipc, int timeout_ms);
+
 void video_ipc_close(VideoIpc *ipc);
 
 #endif

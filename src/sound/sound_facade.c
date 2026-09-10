@@ -15,6 +15,7 @@
  *            The sound module shouldn't use any of the other modules except for loader and utils modules.
  */
 
+#include "video_player.h"
 #include "sound_facade.h"
 
 #include "common/appstate.h"
@@ -87,6 +88,7 @@ sound_result_t sound_system_uninit_device(sound_system_t *system)
 {
         (void)system;
         cleanup_playback_device();
+        video_player_shutdown();
 
         return SOUND_OK;
 }

@@ -34,6 +34,7 @@ double video_player_probe_duration(const char *path);
  * stops mpv only if nobody else took over since.
  */
 bool video_player_load(const char *path, const void *owner);
+/** @brief Detaches owner. mpv keeps running until a new load reuses it or shutdown(). */
 void video_player_release(const void *owner);
 
 bool video_player_is_active(void);

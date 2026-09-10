@@ -7,6 +7,7 @@
  * and switching decoders.
  */
 
+#include "video_player.h"
 #include "playback.h"
 
 #include "common/common.h"
@@ -168,6 +169,8 @@ void stop_playback(void)
 
         if (sound_s->state != SOUND_STATE_PAUSED)
                 sound_s->state = SOUND_STATE_STOPPED;
+
+        video_player_set_paused(true);
 }
 
 sound_result_t sound_resume_playback(void)
@@ -191,6 +194,8 @@ sound_result_t sound_resume_playback(void)
 
         sound_system_set_volume(sound_s, sound_s->volume);
 
+        video_player_set_paused(false);
+
         sound_s->state = SOUND_STATE_PLAYING;
 
         return result;
@@ -208,6 +213,8 @@ void request_pause_playback(void)
         sound_s->volume = vol; // this value is used when unpausing.
 
         sound_s->state = SOUND_STATE_PAUSED;
+
+        video_player_set_paused(true);
 }
 
 void pause_playback(void)
@@ -217,6 +224,8 @@ void pause_playback(void)
         }
 
         sound_s->state = SOUND_STATE_PAUSED;
+
+        video_player_set_paused(true);
 }
 
 sound_result_t toggle_pause_playback(void)

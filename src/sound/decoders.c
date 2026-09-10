@@ -21,6 +21,8 @@
 
 #include "sound/audio_file_info.h"
 #include "webm.h"
+#include "video_decoder.h"
+#include "utils/video_ext.h"
 
 #define MAX_DECODERS 2
 
@@ -258,6 +260,44 @@ static void uninit_webm_decoder(void *decoder)
         ma_webm_uninit((ma_webm *)decoder, NULL);
 }
 
+/* Video: a silent data source that drives mpv (video_decoder.h). */
+
+static ma_result init_video_decoder(const char *filepath, const ma_decoding_backend_config *config, void *decoder)
+{
+        return ma_video_init_file(filepath, config, (ma_video *)decoder);
+}
+
+static void uninit_video_decoder(void *decoder)
+{
+        ma_video_uninit((ma_video *)decoder);
+}
+
+static ma_result video_get_data_format_wrapper(ma_data_source *p, ma_format *f, ma_uint32 *ch,
+                                               ma_uint32 *sr, ma_channel *map, size_t cap)
+{
+        return ma_video_get_data_format((ma_video *)p, f, ch, sr, map, cap);
+}
+
+static ma_result video_seek_to_pcm_frame_wrapper(void *decoder, long long frame_index, ma_seek_origin origin)
+{
+        (void)origin;
+        return ma_video_seek_to_pcm_frame((ma_video *)decoder, (ma_uint64)frame_index);
+}
+
+static ma_result video_get_cursor_wrapper(void *p, long long *cursor)
+{
+        ma_uint64 c = 0;
+        ma_result r = ma_video_get_cursor_in_pcm_frames((ma_video *)p, &c);
+        *cursor = (long long)c;
+        return r;
+}
+
+static void setup_video(void *decoder, void *firstDecoder)
+{
+        (void)decoder;
+        (void)firstDecoder;
+}
+
 /* Setup helpers */
 
 static void setup_ma_decoder(void *decoder, void *firstDecoder)
@@ -409,6 +449,18 @@ static const CodecEntry codec_ops_list[] = {
         .uninit           = (uninit_func)uninit_m4a_decoder
     }},
 #endif
+    {"kewvideo", {
+        .get_file_info    = get_video_file_info,
+        .get_decoder_format = (decoder_format_func)video_get_data_format_wrapper,
+        .seek_to_pcm_frame  = video_seek_to_pcm_frame_wrapper,
+        .get_cursor       = video_get_cursor_wrapper,
+        .decoder_type         = VIDEO,
+        .supportsGapless  = false,
+        .setup_decoder    = setup_video,
+        .decoderSize      = sizeof(ma_video),
+        .init             = (init_func)init_video_decoder,
+        .uninit           = (uninit_func)uninit_video_decoder
+    }},
 };
 
 // clang-format on
@@ -426,6 +478,9 @@ const CodecOps *get_codec_ops(enum decoder_type_t type)
 
 const CodecOps *find_codec_ops(const char *file_path)
 {
+        if (is_video_path(file_path))
+                return get_codec_ops(VIDEO);
+
         if (is_decoder_native(file_path))
                 return &codec_ops_list[0].ops;
 

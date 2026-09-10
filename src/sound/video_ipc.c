@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,6 +215,36 @@ bool video_ipc_poll(VideoIpc *ipc, VideoIpcStatus *st)
                 ipc->len = rest;
         }
         return true;
+}
+
+bool video_ipc_wait_closed(VideoIpc *ipc, int timeout_ms)
+{
+        if (ipc->fd < 0)
+                return true;
+
+        struct timespec start;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+
+        for (;;) {
+                struct timespec now;
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                long elapsed_ms = (now.tv_sec - start.tv_sec) * 1000L +
+                                  (now.tv_nsec - start.tv_nsec) / 1000000L;
+                int remaining = timeout_ms - (int)elapsed_ms;
+                if (remaining <= 0)
+                        return false;
+
+                struct pollfd p = {.fd = ipc->fd, .events = POLLIN};
+                int r = poll(&p, 1, remaining);
+                if (r < 0 && errno == EINTR)
+                        continue;
+                if (r <= 0)
+                        return false;
+
+                VideoIpcStatus scratch = {0};
+                if (!video_ipc_poll(ipc, &scratch))
+                        return true;
+        }
 }
 
 void video_ipc_close(VideoIpc *ipc)

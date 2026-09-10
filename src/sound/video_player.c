@@ -238,6 +238,9 @@ static void stop_locked(void)
 {
         if (ipc.fd >= 0) {
                 send_locked("{\"command\":[\"quit\"]}");
+                /* Hanging up while mpv is mid-event makes it drop the quit. */
+                if (!video_ipc_wait_closed(&ipc, 1000))
+                        k_log("video_player: mpv did not close after quit\n");
                 video_ipc_close(&ipc);
         }
         active = false;
@@ -248,9 +251,12 @@ static void stop_locked(void)
 
 void video_player_release(const void *owner)
 {
+        /* The engine drops the old decoder before the next one starts, so
+         * keep mpv around: a following video reuses it with loadfile, and
+         * the engine calls video_player_shutdown() when audio follows. */
         pthread_mutex_lock(&lock);
         if (active && current_owner == owner)
-                stop_locked();
+                current_owner = NULL;
         pthread_mutex_unlock(&lock);
 }
 
