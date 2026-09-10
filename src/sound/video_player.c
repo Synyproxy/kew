@@ -335,6 +335,10 @@ void video_player_set_rect(const VideoRect *r)
         bool changed = !have_rect || memcmp(&rect, r, sizeof(rect)) != 0;
         rect = *r;
         have_rect = true;
+        if (changed)
+                k_log("video_player: rect row=%d col=%d rows=%d cols=%d term=%dx%d px=%dx%d active=%d\n",
+                      r->row, r->col, r->rows, r->cols, r->term_cols, r->term_rows,
+                      r->term_px_w, r->term_px_h, (int)active);
         if (changed && active && !gone)
                 run_script_locked("place", NULL);
         pthread_mutex_unlock(&lock);
