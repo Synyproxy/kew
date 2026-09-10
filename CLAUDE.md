@@ -58,3 +58,14 @@ restore it afterwards, since kew saves the queue on exit.
 `~/.config/kew/library.dat` is versioned by `DB_VERSION` in
 `src/data/directorytree.c`. Bump it when `FileSystemEntryDisk` changes.
 A bump forces a one-time rescan on next launch.
+
+## Video overlay
+
+Video files play through mpv in a window that Hyprland pins over the
+cover-art square. kew side: `src/sound/video_*.c`, kewrc `videoCommand`
+and `videoExtensions`. Hyprland side:
+`~/.config/hypr/hyprland/scripts/kew-video.sh` (started by kew with
+`KEW_VIDEO_*` environment variables), window rules for class
+`syny.kewvideo` in `rules.lua`, and `music.sh` hides and shows both
+windows. Unit tests for the pure parts: `make test`. mpv 0.41 has no
+`--class`; the overlay's app id comes from `--wayland-app-id`.
