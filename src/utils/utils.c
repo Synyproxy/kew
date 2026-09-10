@@ -665,7 +665,7 @@ int get_last_char_bytes(const char *str, int len)
         return len - i;
 }
 
-void run_detached(const char *cmd)
+void run_detached_env(const char *cmd, const char *const *env)
 {
 #ifndef _WIN32
     if (cmd == NULL || cmd[0] == '\0')
@@ -687,6 +687,11 @@ void run_detached(const char *cmd)
                 if (devnull > STDERR_FILENO)
                     close(devnull);
             }
+            for (const char *const *e = env; e && *e; e++) {
+                char *copy = strdup(*e);
+                if (copy)
+                    putenv(copy); // the child execs, so the leak is moot
+            }
             execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
         }
         _exit(0);
@@ -695,5 +700,11 @@ void run_detached(const char *cmd)
         ;
 #else
     (void)cmd;
+    (void)env;
 #endif
+}
+
+void run_detached(const char *cmd)
+{
+    run_detached_env(cmd, NULL);
 }

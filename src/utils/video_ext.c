@@ -39,7 +39,7 @@ static void build_regexes(void)
                 if (in_audio_list(exts[i]))
                         continue;
                 size_t used = strlen(extra);
-                snprintf(extra + used, sizeof(extra) - used, "|%s", exts[i]);
+                snprintf(extra + used, sizeof(extra) - used, "|%.15s", exts[i]);
         }
         snprintf(library_regex, sizeof(library_regex), "(" AUDIO_LIST "|" PLAYLIST_LIST "%s)$", extra);
         snprintf(music_regex, sizeof(music_regex), "(" AUDIO_LIST "%s)$", extra);

@@ -64,6 +64,10 @@ int copy_file(const char *src, const char *dst);
 // Run a shell command in its own session, without waiting or reaping.
 void run_detached(const char *cmd);
 
+// Like run_detached, but first sets each "KEY=VALUE" string in env
+// (NULL-terminated) in the child's environment.
+void run_detached_env(const char *cmd, const char *const *env);
+
 /**
  * @brief Extracts the numeric value from a string.
  *
