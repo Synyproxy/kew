@@ -68,6 +68,8 @@ void load_song(Node *song, bool is_first_decoder, bool replace_next_song)
         if (result < 1)
         {
                 ps->songHasErrors = true;
+                // No reader thread was started, so nothing else will clear this.
+                ps->songLoading = false;
                 k_log("load_song: song has errors: '%s'\n", song->song.file_path);
         }
         else {
@@ -76,6 +78,8 @@ void load_song(Node *song, bool is_first_decoder, bool replace_next_song)
                 if (sound_result == SOUND_ERROR_SONG)
                 {
                         ps->songHasErrors = true;
+                        // No reader thread was started, so nothing else will clear this.
+                        ps->songLoading = false;
                         k_log("load_song: song has errors (SOUND_ERROR_SONG): '%s'\n", song->song.file_path);
                 }
                 else {
