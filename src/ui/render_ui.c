@@ -1,3 +1,4 @@
+#include "sound/video_player.h"
 /**
  * @file player_ui.c
  * @brief Main player screen rendering.
@@ -1363,6 +1364,9 @@ void render_ui(Model *model, RenderContext *ctx)
         }
 
         rendering = true;
+
+        /* The mpv overlay covers the cover area, which only the track view has. */
+        video_player_set_visible(model->state.currentView == TRACK_VIEW);
 
         s_backend_state.render_chroma = (model->state.ui.chroma_start_requested || model->state.ui.chroma_started) &&
                                         model->state.currentView == TRACK_VIEW;

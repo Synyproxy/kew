@@ -23,7 +23,7 @@ typedef struct {
 
 /** @brief Fills out[] with "KEY=VALUE" strings for the script. Returns the count. */
 int video_player_build_env(const VideoRect *r, const char *action, const char *file,
-                           const char *socket_path, char out[][160], int max);
+                           const char *socket_path, bool visible, char out[][160], int max);
 
 /** @brief Duration in seconds via ffprobe, or a value <= 0 on failure. */
 double video_player_probe_duration(const char *path);
@@ -49,6 +49,19 @@ void video_player_set_volume(int percent);
 
 /** @brief Records where the cover area is and re-places the window if it moved. */
 void video_player_set_rect(const VideoRect *r);
+
+/**
+ * @brief Shows or hides the window. Only the track view has a cover area,
+ * so the renderer calls this with true there and false everywhere else.
+ */
+void video_player_set_visible(bool visible);
+
+/**
+ * @brief Puts the window back on top of kew. Focusing kew raises it above
+ * the pinned overlay; the mouse handler calls this on every click so the
+ * video reappears right away. Rate limited, cheap when nothing plays.
+ */
+void video_player_raise(void);
 
 void video_player_shutdown(void);
 

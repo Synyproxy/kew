@@ -1219,11 +1219,14 @@ ComponentMsg component_cover_centered(const Model *model, k_Rect region, DrawBuf
                 return (ComponentMsg){0};
 
         if (is_video_path(songdata->file_path)) {
+                /* A centred cover ignores region.col and is centred over the
+                 * whole terminal (see draw_square_bitmap_to_buf); report the
+                 * same span so the video window lands where the art would. */
                 VideoRect r = {
                     .row = region.row,
-                    .col = region.col,
+                    .col = 0,
                     .rows = region.height,
-                    .cols = region.width,
+                    .cols = model->term_w,
                     .term_rows = model->term_h,
                     .term_cols = model->term_w,
                     .term_px_w = model->term_size.width_pixels,

@@ -17,8 +17,9 @@ int main(void)
                        .term_rows = 45, .term_cols = 120,
                        .term_px_w = 1080, .term_px_h = 680};
 
-        int n = video_player_build_env(&r, "start", "/v/clip.mp4", "/run/user/1000/kew-mpv.sock", env, 16);
-        CHECK(n == 11);
+        int n = video_player_build_env(&r, "start", "/v/clip.mp4", "/run/user/1000/kew-mpv.sock", true, env, 16);
+        CHECK(n == 12);
+        CHECK_STR(find(env, n, "KEW_VIDEO_VISIBLE="), "1");
         CHECK_STR(find(env, n, "KEW_VIDEO_ACTION="), "start");
         CHECK_STR(find(env, n, "KEW_VIDEO_FILE="), "/v/clip.mp4");
         CHECK_STR(find(env, n, "KEW_VIDEO_SOCKET="), "/run/user/1000/kew-mpv.sock");
@@ -31,21 +32,22 @@ int main(void)
         CHECK_STR(find(env, n, "KEW_TERM_PX_W="), "1080");
         CHECK_STR(find(env, n, "KEW_TERM_PX_H="), "680");
 
-        /* place mode has no file */
-        n = video_player_build_env(&r, "place", NULL, "/tmp/s.sock", env, 16);
-        CHECK(n == 10);
+        /* place mode may have no file */
+        n = video_player_build_env(&r, "place", NULL, "/tmp/s.sock", false, env, 16);
+        CHECK(n == 11);
         CHECK(find(env, n, "KEW_VIDEO_FILE=") == NULL);
         CHECK_STR(find(env, n, "KEW_VIDEO_ACTION="), "place");
+        CHECK_STR(find(env, n, "KEW_VIDEO_VISIBLE="), "0");
 
         /* unknown pixel size is passed as -1 */
         r.term_px_w = -1;
         r.term_px_h = 0;
-        n = video_player_build_env(&r, "place", NULL, "/tmp/s.sock", env, 16);
+        n = video_player_build_env(&r, "place", NULL, "/tmp/s.sock", true, env, 16);
         CHECK_STR(find(env, n, "KEW_TERM_PX_W="), "-1");
         CHECK_STR(find(env, n, "KEW_TERM_PX_H="), "-1");
 
         /* too small an array truncates safely */
-        n = video_player_build_env(&r, "start", "/x", "/s", env, 3);
+        n = video_player_build_env(&r, "start", "/x", "/s", true, env, 3);
         CHECK(n == 3);
 
         KT_MAIN_END();

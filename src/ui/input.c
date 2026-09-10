@@ -38,6 +38,8 @@
 #include "utils/term.h"
 #include "utils/utils.h"
 
+#include "sound/video_player.h"
+
 #include <ctype.h>
 #include <gio/gio.h>
 #include <glib.h>
@@ -515,6 +517,11 @@ bool handle_mouse_event(struct tb_event *ev, struct Msg *event, bool do_scroll)
 {
         if (ev->type != TB_EVENT_MOUSE)
                 return false;
+
+        /* A click that focused kew also put it above the video overlay. */
+        if (ev->key == TB_KEY_MOUSE_LEFT || ev->key == TB_KEY_MOUSE_RIGHT ||
+            ev->key == TB_KEY_MOUSE_MIDDLE)
+                video_player_raise();
 
         Model *model = get_model();
         int mouse_x = ev->x + 1;

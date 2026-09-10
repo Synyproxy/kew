@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef KEW_VIDEO_PLAYER_TEST
@@ -17,7 +18,7 @@
 #define CONNECT_TIMEOUT_MS 3000
 
 int video_player_build_env(const VideoRect *r, const char *action, const char *file,
-                           const char *socket_path_in, char out[][160], int max)
+                           const char *socket_path_in, bool visible, char out[][160], int max)
 {
         int n = 0;
 #define PUT(...)                                                        \
@@ -40,6 +41,7 @@ int video_player_build_env(const VideoRect *r, const char *action, const char *f
         PUT("KEW_TERM_COLS=%d", r->term_cols);
         PUT("KEW_TERM_PX_W=%d", r->term_px_w > 0 ? r->term_px_w : -1);
         PUT("KEW_TERM_PX_H=%d", r->term_px_h > 0 ? r->term_px_h : -1);
+        PUT("KEW_VIDEO_VISIBLE=%d", visible ? 1 : 0);
 #undef PUT
         return n;
 }
@@ -107,6 +109,8 @@ static bool gone = false;
 static VideoRect rect;
 static bool have_rect = false;
 static char socket_path[256];
+static char current_path[1024];
+static bool visible = true;
 static int last_volume = -1;
 
 static void socket_path_init(void)
@@ -138,7 +142,7 @@ static bool run_script_locked(const char *action, const char *file)
 
         char env[16][160];
         const char *envp[17];
-        int n = video_player_build_env(rect_or_default(), action, file, socket_path, env, 16);
+        int n = video_player_build_env(rect_or_default(), action, file, socket_path, visible, env, 16);
         for (int i = 0; i < n; i++)
                 envp[i] = env[i];
         envp[n] = NULL;
@@ -196,6 +200,9 @@ bool video_player_load(const char *path, const void *owner)
                 send_locked(cmd);
                 if (!gone) {
                         current_owner = owner;
+                        snprintf(current_path, sizeof(current_path), "%s", path);
+                        /* The new file may have another aspect ratio. */
+                        run_script_locked("place", current_path);
                         pthread_mutex_unlock(&lock);
                         k_log("video_player: loadfile '%s'\n", path);
                         return true;
@@ -209,6 +216,7 @@ bool video_player_load(const char *path, const void *owner)
         gone = false;
         active = false;
 
+        snprintf(current_path, sizeof(current_path), "%s", path);
         if (!run_script_locked("start", path)) {
                 pthread_mutex_unlock(&lock);
                 k_log("video_player: videoCommand is empty\n");
@@ -339,8 +347,37 @@ void video_player_set_rect(const VideoRect *r)
                 k_log("video_player: rect row=%d col=%d rows=%d cols=%d term=%dx%d px=%dx%d active=%d\n",
                       r->row, r->col, r->rows, r->cols, r->term_cols, r->term_rows,
                       r->term_px_w, r->term_px_h, (int)active);
-        if (changed && active && !gone)
-                run_script_locked("place", NULL);
+        if (changed && active && !gone && visible)
+                run_script_locked("place", current_path[0] ? current_path : NULL);
+        pthread_mutex_unlock(&lock);
+}
+
+void video_player_raise(void)
+{
+        static struct timespec last;
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long ms = (now.tv_sec - last.tv_sec) * 1000 + (now.tv_nsec - last.tv_nsec) / 1000000;
+        if (last.tv_sec != 0 && ms >= 0 && ms < 300)
+                return;
+        last = now;
+
+        pthread_mutex_lock(&lock);
+        if (active && !gone && visible && have_rect)
+                run_script_locked("raise", current_path[0] ? current_path : NULL);
+        pthread_mutex_unlock(&lock);
+}
+
+void video_player_set_visible(bool v)
+{
+        pthread_mutex_lock(&lock);
+        bool changed = visible != v;
+        visible = v;
+        /* Showing waits for a real rectangle: the track view reports one as
+         * soon as it draws and set_rect places then. Placing from the
+         * placeholder first would race that and could win. */
+        if (changed && active && !gone && (!v || have_rect))
+                run_script_locked(v ? "place" : "hide", current_path[0] ? current_path : NULL);
         pthread_mutex_unlock(&lock);
 }
 
