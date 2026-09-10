@@ -4,6 +4,7 @@
  */
 
 #include "waveform.h"
+#include "utils/video_ext.h"
 
 #include "decoders.h"
 #include "common/path_max.h"
@@ -11,6 +12,10 @@
 #include "utils/k_log.h"
 #include "utils/utils.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -240,6 +245,42 @@ static float sample_to_float(const void *frames, ma_format format, size_t index)
         }
 }
 
+/* Extracts the audio track of a video into a small mono wav next to the
+ * cache entry. Returns false when ffmpeg is missing or fails. */
+static bool extract_audio_to_wav(const char *video_path, char *wav_out, size_t wav_size)
+{
+        char cache_path[KEW_PATH_MAX];
+        if (!cache_file_for(video_path, cache_path, sizeof(cache_path)))
+                return false;
+        if (snprintf(wav_out, wav_size, "%s.wav", cache_path) >= (int)wav_size)
+                return false;
+
+        pid_t pid = fork();
+        if (pid < 0)
+                return false;
+        if (pid == 0) {
+                int devnull = open("/dev/null", O_RDWR);
+                if (devnull >= 0) {
+                        dup2(devnull, STDIN_FILENO);
+                        dup2(devnull, STDOUT_FILENO);
+                        dup2(devnull, STDERR_FILENO);
+                }
+                execlp("ffmpeg", "ffmpeg", "-nostdin", "-loglevel", "error", "-y",
+                       "-i", video_path, "-vn", "-ac", "1", "-ar", "8000",
+                       "-f", "wav", wav_out, (char *)NULL);
+                _exit(127);
+        }
+
+        int wstatus = 0;
+        while (waitpid(pid, &wstatus, 0) < 0 && errno == EINTR)
+                ;
+        if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+                remove(wav_out);
+                return false;
+        }
+        return true;
+}
+
 static void *worker_main(void *arg)
 {
         char *path = arg;
@@ -260,14 +301,29 @@ static void *worker_main(void *arg)
                 return NULL;
         }
 
-        const CodecOps *ops = find_codec_ops(path);
+        char wav_path[KEW_PATH_MAX] = "";
+        const char *decode_path = path;
+        if (is_video_path(path)) {
+                if (!extract_audio_to_wav(path, wav_path, sizeof(wav_path))) {
+                        k_log("waveform: ffmpeg extraction failed for '%s'\n", path);
+                        free(path);
+                        return NULL;
+                }
+                decode_path = wav_path;
+        }
+
+        const CodecOps *ops = find_codec_ops(decode_path);
         if (!ops) {
+                if (wav_path[0])
+                        remove(wav_path);
                 free(path);
                 return NULL;
         }
 
         void *decoder = malloc(ops->decoderSize);
         if (!decoder) {
+                if (wav_path[0])
+                        remove(wav_path);
                 free(path);
                 return NULL;
         }
@@ -276,9 +332,11 @@ static void *worker_main(void *arg)
         config.preferredFormat = ma_format_f32;
         config.seekPointCount = 0;
 
-        if (ops->init(path, &config, decoder) != MA_SUCCESS) {
+        if (ops->init(decode_path, &config, decoder) != MA_SUCCESS) {
                 k_log("waveform: decoder init failed for '%s'\n", path);
                 free(decoder);
+                if (wav_path[0])
+                        remove(wav_path);
                 free(path);
                 return NULL;
         }
@@ -298,6 +356,8 @@ static void *worker_main(void *arg)
         if (!chunk) {
                 ops->uninit(decoder);
                 free(decoder);
+                if (wav_path[0])
+                        remove(wav_path);
                 free(path);
                 return NULL;
         }
@@ -387,6 +447,8 @@ static void *worker_main(void *arg)
         free(chunk);
         ops->uninit(decoder);
         free(decoder);
+        if (wav_path[0])
+                remove(wav_path);
         free(path);
         return NULL;
 }
