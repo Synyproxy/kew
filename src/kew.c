@@ -47,6 +47,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
 
 #include "sys/discord_rpc.h"
 #include "sys/mpris.h"
+#include "sound/video_player.h"
 #include "sys/notifications.h"
 #include "sys/sys_integration.h"
 
@@ -251,6 +252,8 @@ void songdata_shutdown(void)
  */
 void kew_shutdown()
 {
+        video_player_shutdown();
+
         Model *model = get_model();
         bool no_music_found = (model->library == NULL || model->library->children == NULL);
 
