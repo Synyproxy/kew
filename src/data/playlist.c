@@ -15,6 +15,7 @@
 
 #include "common/appstate.h"
 #include "common/common.h"
+#include "utils/video_ext.h"
 
 #include "directorytree.h"
 
@@ -854,7 +855,7 @@ Node *read_m3u_file(const char *filepath, PlayList *playlist)
 int make_playlist(PlayList **playlist, int argc, char *argv[], bool exact_search, const char *path)
 {
         const char *delimiter = ":";
-        const char *allowed_extensions = MUSIC_FILE_EXTENSIONS;
+        const char *allowed_extensions = music_extensions_regex();
 
         enum SearchType search_type = SearchAny;
         int search_type_index = 1;
@@ -1367,6 +1368,9 @@ int is_music_file(const char *filename)
 {
         if (filename == NULL)
                 return 0;
+
+        if (is_video_path(filename))
+                return 1;
 
         const char *extensions[] = {".m4a", ".aac", ".mp3", ".ogg",
                                     ".flac", ".wav", ".opus", ".webm", ".aiff"};

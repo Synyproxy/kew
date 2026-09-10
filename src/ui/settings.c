@@ -8,6 +8,7 @@
 
 #include "settings.h"
 #include "common/model.h"
+#include "utils/video_ext.h"
 #include "components.h"
 
 #include "common_ui.h"
@@ -909,6 +910,9 @@ void set_default_config(AppSettings *settings)
         c_strcpy(settings->quitAfterStopping, "0",
                  sizeof(settings->quitAfterStopping));
         settings->hideCommand[0] = '\0';
+        settings->videoCommand[0] = '\0';
+        c_strcpy(settings->videoExtensions, "mp4|mkv|mov|avi|m4v",
+                 sizeof(settings->videoExtensions));
         c_strcpy(settings->clearListClearsAll, "1",
                  sizeof(settings->clearListClearsAll));
         c_strcpy(settings->hideGlimmeringText, "0",
@@ -1528,6 +1532,14 @@ void construct_app_settings(AppSettings *settings, KeyValuePair *pairs, int coun
                         snprintf(settings->hideCommand,
                                  sizeof(settings->hideCommand), "%s",
                                  pair->value);
+                } else if (strcmp(lowercase_key, "videocommand") == 0) {
+                        snprintf(settings->videoCommand,
+                                 sizeof(settings->videoCommand), "%s",
+                                 pair->value);
+                } else if (strcmp(lowercase_key, "videoextensions") == 0) {
+                        snprintf(settings->videoExtensions,
+                                 sizeof(settings->videoExtensions), "%s",
+                                 pair->value);
                 } else if (strcmp(lowercase_key, "clearlistclearsall") == 0) {
                         snprintf(settings->clearListClearsAll,
                                  sizeof(settings->clearListClearsAll), "%s",
@@ -1704,6 +1716,10 @@ void construct_app_settings(AppSettings *settings, KeyValuePair *pairs, int coun
                 // move_song_up is no longer t, it needs to be changed
                 c_strcpy(settings->move_song_up, "f", sizeof(settings->move_song_up));
         }
+
+        video_ext_configure(settings->videoCommand[0] != '\0'
+                                ? settings->videoExtensions
+                                : "");
 }
 
 KeyValuePair *read_key_value_pairs(const char *file_path, int *count,
@@ -2350,6 +2366,14 @@ void set_config(AppSettings *settings, UISettings *ui)
         fprintf(file, "# Meant for a window manager script that hides the terminal\n");
         fprintf(file, "# instead of quitting kew. Empty disables the action.\n");
         fprintf(file, "hideCommand=%s\n\n", settings->hideCommand);
+
+        fprintf(file, "# Shell command that starts and positions a video overlay window\n");
+        fprintf(file, "# (mpv) over the cover art. Empty means video files are ignored.\n");
+        fprintf(file, "# See kew-video.sh for the environment variables it receives.\n");
+        fprintf(file, "videoCommand=%s\n\n", settings->videoCommand);
+
+        fprintf(file, "# File extensions treated as video, separated by |.\n");
+        fprintf(file, "videoExtensions=%s\n\n", settings->videoExtensions);
 
         fprintf(file, "# Whether clearing the playlist also removes the "
                       "currently playing song.\n");

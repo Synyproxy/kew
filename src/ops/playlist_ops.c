@@ -11,6 +11,7 @@
 #include "playlist_edit_ops.h"
 
 #include "common/common.h"
+#include "utils/video_ext.h"
 #include "common/model.h"
 #include "library_ops.h"
 #include "playback_clock.h"
@@ -1022,7 +1023,7 @@ void play_all_albums(void)
 void play_command_with_playlist(int argc, char **argv)
 {
         PlayList *playlist = get_playlist();
-        const char *allowed_extensions = MUSIC_FILE_EXTENSIONS;
+        const char *allowed_extensions = music_extensions_regex();
 
         for (int i = 2; i < argc; i++) {
                 build_playlist_recursive(argv[i], allowed_extensions, playlist);

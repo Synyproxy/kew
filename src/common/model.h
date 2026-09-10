@@ -692,6 +692,8 @@ typedef struct
         char simpleTimeStatus[2];
         char quitAfterStopping[2];
         char hideCommand[512]; /**< Shell command the "hide" action runs, detached. */
+        char videoCommand[512]; /**< Shell command that starts and places the mpv overlay. Empty disables video. */
+        char videoExtensions[128]; /**< Regex alternatives treated as video, e.g. "mp4|mkv". */
         char clearListClearsAll[2];
         char hideGlimmeringText[2];
         char useArtistLink[2];

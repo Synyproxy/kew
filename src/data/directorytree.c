@@ -16,6 +16,7 @@
 #include "common/appstate.h"
 
 #include "utils/file.h"
+#include "utils/video_ext.h"
 #include "utils/utils.h"
 #include "utils/k_log.h"
 #include "loader/tagLibWrapper.h"
@@ -727,7 +728,7 @@ static int read_directory(const char *path, FileSystemEntry *parent)
                 return 0;
 
         regex_t regex;
-        regcomp(&regex, AUDIO_EXTENSIONS, REG_EXTENDED | REG_ICASE);
+        regcomp(&regex, library_extensions_regex(), REG_EXTENDED | REG_ICASE);
 
         int num_entries = 0;
 
@@ -816,7 +817,7 @@ static int read_directory(const char *path, FileSystemEntry *parent)
         }
 
         regex_t regex;
-        regcomp(&regex, AUDIO_EXTENSIONS, REG_EXTENDED | REG_ICASE);
+        regcomp(&regex, library_extensions_regex(), REG_EXTENDED | REG_ICASE);
 
         int num_entries = 0;
 
